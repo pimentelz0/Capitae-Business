@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0B0B0B;
+  --color-foreground: #FFFFFF;
+  --color-primary: #00C853;
+  --color-secondary: #1E1E1E;
+  --color-muted: #A1A1AA;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: #0B0B0B;
+    --foreground: #FFFFFF;
+    --primary: #00C853;
+    --secondary: #1E1E1E;
+    --muted: #A1A1AA;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-color: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    overflow-x: hidden;
+  }
+
+  html {
+    height: -webkit-fill-available;
+  }
+
+  .light {
+    --background: #F3F4F6;
+    --foreground: #111827;
+    --secondary: #FFFFFF;
+    --muted: #4B5563;
+    
+    --color-background: #F3F4F6;
+    --color-foreground: #111827;
+    --color-secondary: #FFFFFF;
+    --color-muted: #4B5563;
+  }
+
+  /* Beautiful high-end light mode adjustments for maximum contrast and legibility */
+  .light {
+    color: #111827;
+  }
+
+  /* Automatically map all text-white text styles inside light mode, excluding green/red action elements */
+  .light .text-white:not(
+    button *,
+    .bg-primary *,
+    .bg-emerald-500 *,
+    .bg-green-500 *,
+    .bg-green-600 *,
+    .bg-red-500 *,
+    .bg-rose-500 *,
+    .bg-indigo-500 *,
+    .bg-primary,
+    .bg-emerald-500,
+    .bg-green-500,
+    .bg-green-600,
+    .bg-red-500,
+    .bg-rose-500,
+    .bg-indigo-500,
+    .text-primary,
+    nav *,
+    [class*="bg-green-"],
+    [class*="bg-red-"],
+    [class*="bg-emerald-"],
+    [class*="bg-indigo-"],
+    [class*="bg-blue-"],
+    [class*="bg-teal-"]
+  ) {
+    color: #111827 !important;
+  }
+
+  /* Fix inputs, selects, textareas in light mode to have beautiful white background with high-contrast text and thin, clean border */
+  .light input, 
+  .light select, 
+  .light textarea {
+    color: #111827 !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid rgba(17, 24, 39, 0.15) !important;
+  }
+
+  /* Fix input placeholders to be perfectly visible but distinct */
+  .light input::placeholder, 
+  .light textarea::placeholder {
+    color: #6B7280 !important;
+  }
+
+  /* Make sure background hover states inside light mode are soft dark grey rather than high-contrast white */
+  .light .hover\:text-white:hover {
+    color: #111827 !important;
+  }
+
+  /* Ensure text-muted is perfectly legible in Light Mode */
+  .light .text-muted {
+    color: #4B5563 !important;
+  }
+
+  /* Specific fix for search bar and general canvas backgrounds inside light mode */
+  .light .bg-background {
+    background-color: #F3F4F6 !important;
+  }
+
+  /* Specific styles for card items inside light mode */
+  .light .bg-secondary {
+    background-color: #FFFFFF !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+    border: 1px solid rgba(17, 24, 39, 0.06) !important;
+  }
+
+  /* Balance Cards and Glass Header/Footer elements */
+  .light .bg-background\/40,
+  .light .bg-background\/50,
+  .light .bg-background\/80 {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08) !important;
+  }
+
+  /* Navigation overrides for high contrast and modern aesthetics */
+  .light nav button {
+    color: #4B5563 !important;
+  }
+
+  .light nav button:hover {
+    color: #111827 !important;
+  }
+
+  .light nav button.text-primary {
+    color: #00C853 !important;
+  }
+}

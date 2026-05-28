@@ -1,0 +1,423 @@
+import React, { useState } from 'react';
+import { Produto } from '../types';
+import { Plus, Pencil, Trash2, ShieldAlert, Layers, ShieldCheck, DollarSign, Package, PlusCircle, MinusCircle, AlertTriangle, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface EstoqueProps {
+  produtos: Produto[];
+  onAddProduto: (produto: Omit<Produto, 'id'>) => void;
+  onUpdateProduto: (produto: Produto) => void;
+  onDeleteProduto: (id: string) => void;
+  isPrivateMode: boolean;
+}
+
+export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDeleteProduto, isPrivateMode }: EstoqueProps) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProdutoId, setEditingProdutoId] = useState<string | null>(null);
+
+  // Form states
+  const [nome, setNome] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [quantidade, setQuantidade] = useState<number>(0);
+  const [estoqueMinimo, setEstoqueMinimo] = useState<number>(5);
+  const [precoCusto, setPrecoCusto] = useState<number>(0);
+  const [precoVenda, setPrecoVenda] = useState<number>(0);
+
+  // Edit form wrapper triggers
+  const startEdit = (p: Produto) => {
+    setEditingProdutoId(p.id);
+    setNome(p.nome);
+    setCategoria(p.categoria);
+    setQuantidade(p.quantidade);
+    setEstoqueMinimo(p.estoque_minimo);
+    setPrecoCusto(p.preco_custo);
+    setPrecoVenda(p.preco_venda);
+    setShowAddForm(true);
+  };
+
+  const handleCancel = () => {
+    setEditingProdutoId(null);
+    setNome('');
+    setCategoria('');
+    setQuantidade(0);
+    setEstoqueMinimo(5);
+    setPrecoCusto(0);
+    setPrecoVenda(0);
+    setShowAddForm(false);
+  };
+
+  // Submit product creation or update
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome || !categoria || quantidade < 0 || precoCusto < 0 || precoVenda < 0) {
+      alert('Preencha os campos obrigatórios com valores válidos.');
+      return;
+    }
+
+    if (editingProdutoId) {
+      onUpdateProduto({
+        id: editingProdutoId,
+        nome,
+        categoria,
+        quantidade,
+        estoque_minimo: estoqueMinimo,
+        preco_custo: precoCusto,
+        preco_venda: precoVenda
+      });
+    } else {
+      onAddProduto({
+        nome,
+        categoria,
+        quantidade,
+        estoque_minimo: estoqueMinimo,
+        preco_custo: precoCusto,
+        preco_venda: precoVenda
+      });
+    }
+
+    handleCancel();
+  };
+
+  // Micro adjustments in-line
+  const adjustQty = (produto: Produto, increment: number) => {
+    onUpdateProduto({
+      ...produto,
+      quantidade: Math.max(0, produto.quantidade + increment)
+    });
+  };
+
+  // Stats
+  const totalItems = produtos.length;
+  const lowStockItems = produtos.filter(p => p.quantidade <= p.estoque_minimo && p.quantidade > 0).length;
+  const outOfStockItems = produtos.filter(p => p.quantidade === 0).length;
+  
+  const investidoTotal = produtos.reduce((sum, p) => sum + (p.preco_custo * p.quantidade), 0);
+  const faturamentoEstimado = produtos.reduce((sum, p) => sum + (p.preco_venda * p.quantidade), 0);
+  const retornoEstimado = faturamentoEstimado - investidoTotal;
+
+  return (
+    <div className="space-y-6">
+      {/* Visual Header */}
+      <div className="relative overflow-hidden bg-secondary border border-foreground/5 p-6 rounded-[32px] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-[#00C853] bg-[#00C853]/10 px-3 py-1.5 rounded-full mb-2 inline-block font-sans">
+            Garantia de Abastecimento
+          </span>
+          <h1 className="text-3xl font-black tracking-tight text-white mt-1">Controle de Estoque</h1>
+          <p className="text-xs text-muted mt-1">Estoque inteligente com alertas automáticos de reposição para comércios.</p>
+        </div>
+        <button
+          onClick={() => {
+            if (showAddForm) {
+              handleCancel();
+            } else {
+              setShowAddForm(true);
+            }
+          }}
+          className="px-6 py-3.5 bg-primary hover:bg-opacity-95 text-background font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_0_20px_rgba(0,200,83,0.2)] flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4 font-black" />
+          Cadastrar Produto
+        </button>
+      </div>
+
+      {/* Grid of Inventory Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total catalog items */}
+        <div className="bg-secondary p-5 rounded-3xl border border-foreground/5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <Package className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted font-bold uppercase">Total de Itens</p>
+            <h3 className="text-2xl font-black text-white">{totalItems}</h3>
+          </div>
+        </div>
+
+        {/* Low Stock count */}
+        <div className="bg-secondary p-5 rounded-3xl border border-foreground/5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted font-bold uppercase">Estoque Baixo</p>
+            <h3 className="text-2xl font-black text-yellow-500">{lowStockItems} itens</h3>
+          </div>
+        </div>
+
+        {/* Out of Stock count */}
+        <div className="bg-secondary p-5 rounded-3xl border border-foreground/5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted font-bold uppercase">Sem Estoque</p>
+            <h3 className="text-2xl font-black text-red-500">{outOfStockItems} itens</h3>
+          </div>
+        </div>
+
+        {/* Total Cost Invested */}
+        <div className="bg-secondary p-5 rounded-3xl border border-foreground/5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+            <DollarSign className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted font-bold uppercase">Ativo do Estoque</p>
+            <h3 className="text-2xl font-black text-emerald-400">
+              R$ {isPrivateMode ? '•••' : investidoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Slide down Product Entry / Edit Form */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden bg-secondary border border-foreground/5 rounded-3xl"
+          >
+            <div className="p-6 border-b border-foreground/5 bg-background/60 flex justify-between items-center">
+              <h3 className="font-bold text-base text-white">
+                {editingProdutoId ? `Editar Produto: ${nome}` : 'Cadastrar Novo Produto'}
+              </h3>
+              <button 
+                onClick={handleCancel}
+                className="text-xs text-muted hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase">Nome do Produto*</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Coca-Cola Lata 350ml, Camiseta Polo G..."
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase">Categoria*</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Bebidas, Roupas, Serviços, Alimentos..."
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase">Quantidade Atual em Estoque*</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={quantidade || ''}
+                    onChange={(e) => setQuantidade(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-bold transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase">Estoque Mínimo de Alerta</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={estoqueMinimo || ''}
+                    onChange={(e) => setEstoqueMinimo(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Preço de Custo (R$)*</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      placeholder="0,00"
+                      value={precoCusto || ''}
+                      onChange={(e) => setPrecoCusto(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-black text-red-400 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Preço de Venda (R$)*</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      placeholder="0,00"
+                      value={precoVenda || ''}
+                      onChange={(e) => setPrecoVenda(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-black text-emerald-400 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="flex-1 py-3.5 bg-background border border-foreground/5 hover:bg-foreground/5 text-muted hover:text-white rounded-2xl font-bold transition-all text-xs text-center uppercase"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3.5 bg-primary text-background font-bold rounded-2xl transition-all hover:bg-opacity-95 text-xs text-center uppercase"
+                  >
+                    Salvar Item
+                  </button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product List Table */}
+      <div className="bg-secondary border border-foreground/5 rounded-[32px] overflow-hidden">
+        <div className="p-6 border-b border-foreground/5 bg-background/55">
+          <h3 className="font-bold text-base text-white">Catálogo de Produtos e Insumos</h3>
+        </div>
+
+        <div className="p-6">
+          {produtos.length === 0 ? (
+            <div className="py-20 text-center text-muted">
+              <AlertCircle className="w-12 h-12 text-muted/30 mx-auto mb-4" />
+              <p className="text-base font-bold">Nenhum item cadastrado no estoque.</p>
+              <p className="text-xs mt-1">Utilize o botão "Cadastrar Produto" acima para carregar itens ao estoque.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-foreground/5 text-[10px] text-muted font-bold uppercase tracking-wider">
+                    <th className="py-3 px-2">Produto</th>
+                    <th className="py-3 px-2">Categoria</th>
+                    <th className="py-3 px-2 text-center">Quantidade</th>
+                    <th className="py-3 px-2 text-center">Status Estoque</th>
+                    <th className="py-3 px-2 text-right">Preço Custo</th>
+                    <th className="py-3 px-2 text-right">Preço Venda</th>
+                    <th className="py-3 px-2 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/5 text-sm font-semibold text-white">
+                  {produtos.map(p => {
+                    const isOutOfStock = p.quantidade === 0;
+                    const isLowStock = p.quantidade <= p.estoque_minimo && p.quantidade > 0;
+                    
+                    return (
+                      <tr key={p.id} className="hover:bg-foreground/5 transition-colors group">
+                        {/* Name */}
+                        <td className="py-3.5 px-2">
+                          <p className="font-extrabold text-foreground truncate max-w-xs">{p.nome}</p>
+                          <span className="text-[10px] text-muted font-mono">ID: #{p.id.substring(0, 8)}</span>
+                        </td>
+
+                        {/* Category */}
+                        <td className="py-3.5 px-2">
+                          <span className="text-xs bg-background border border-foreground/5 px-2.5 py-1 rounded-lg">
+                            {p.categoria}
+                          </span>
+                        </td>
+
+                        {/* Inline Qty Adjust */}
+                        <td className="py-3.5 px-2 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => adjustQty(p, -1)}
+                              className="text-muted hover:text-red-500 transition-colors"
+                              title="Diminuir unidade"
+                            >
+                              <MinusCircle className="w-5 h-5 pointer-events-auto" />
+                            </button>
+                            <span className="font-mono text-base font-bold w-8 text-center">{p.quantidade}</span>
+                            <button
+                              onClick={() => adjustQty(p, 1)}
+                              className="text-muted hover:text-emerald-500 transition-colors"
+                              title="Aumentar unidade"
+                            >
+                              <PlusCircle className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Status alert badges */}
+                        <td className="py-3.5 px-2 text-center">
+                          {isOutOfStock ? (
+                            <span className="text-[10px] font-black uppercase text-red-500 bg-red-500/10 border border-red-500/10 px-2.5 py-1 rounded-full">
+                              Esgotado
+                            </span>
+                          ) : isLowStock ? (
+                            <span className="text-[10px] font-black uppercase text-yellow-500 bg-yellow-500/10 border border-yellow-500/10 px-2.5 py-1 rounded-full">
+                              Baixo (Repor)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-2.5 py-1 rounded-full">
+                              Adequado
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Cost */}
+                        <td className="py-3.5 px-2 text-right font-mono font-medium text-red-400">
+                          R$ {isPrivateMode ? '•••' : p.preco_custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Price */}
+                        <td className="py-3.5 px-2 text-right font-mono font-bold text-emerald-400">
+                          R$ {isPrivateMode ? '•••' : p.preco_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3.5 px-2 text-center">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              onClick={() => startEdit(p)}
+                              className="p-1.5 text-muted hover:text-white rounded-lg hover:bg-foreground/5 transition-colors"
+                              title="Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onDeleteProduto(p.id)}
+                              className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -7,19 +7,59 @@ import { createClient } from '@supabase/supabase-js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Sanitization helpers to clean up any copy-paste artifact like quotes, slashes, or end subpaths
+const cleanSupabaseUrl = (url: string): string => {
+  if (!url) return '';
+  let clean = url.trim();
+  // Strip surrounding double/single quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || 
+      (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  // Strip trailing slashes
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1).trim();
+  }
+  // Strip trailing /rest/v1 paths or /auth/v1 paths common when copy-pasting
+  if (clean.endsWith('/rest/v1')) {
+    clean = clean.slice(0, -8);
+  } else if (clean.endsWith('/auth/v1')) {
+    clean = clean.slice(0, -8);
+  }
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1).trim();
+  }
+  return clean;
+};
+
+const cleanSupabaseKey = (key: string): string => {
+  if (!key) return '';
+  let clean = key.trim();
+  // Strip surrounding double/single quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || 
+      (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  return clean;
+};
+
 // Initialize Supabase client for backend use dynamically to avoid crashing if env variables are not set during server start
 let supabaseClient: any = null;
 function getSupabase() {
   if (supabaseClient) return supabaseClient;
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  let rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  let rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+  const supabaseUrl = cleanSupabaseUrl(rawUrl);
+  const supabaseKey = cleanSupabaseKey(rawKey);
 
   if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase: VITE_SUPABASE_URL or keys are missing on the backend.');
     return null;
   }
 
+  console.log('Server: Initializing backend Supabase client with URL:', supabaseUrl);
   supabaseClient = createClient(supabaseUrl, supabaseKey);
   return supabaseClient;
 }
@@ -52,6 +92,20 @@ async function startServer() {
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Dynamic Supabase configuration endpoint for client
+  app.get("/api/config", (req, res) => {
+    let u = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    u = u.trim();
+    if (u.endsWith('/')) {
+      u = u.slice(0, -1);
+    }
+    const k = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+    res.json({
+      supabaseUrl: u,
+      supabaseAnonKey: k.trim()
+    });
   });
 
   // Kiwify Webhook Endpoint

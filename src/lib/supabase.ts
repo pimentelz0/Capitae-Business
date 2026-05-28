@@ -1,7 +1,55 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://umbavqavbopqajpvlpta.supabase.co';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_YvN_P3YptuAKice53SgVpg_6PFYq2C0';
+// Sanitization helpers to clean up any copy-paste artifact like quotes, slashes, or end subpaths
+const cleanSupabaseUrl = (url: string): string => {
+  if (!url) return '';
+  let clean = url.trim();
+  // Strip surrounding double/single quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || 
+      (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  // Strip trailing slashes
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1).trim();
+  }
+  // Strip trailing /rest/v1 paths or /auth/v1 paths common when copy-pasting
+  if (clean.endsWith('/rest/v1')) {
+    clean = clean.slice(0, -8);
+  } else if (clean.endsWith('/auth/v1')) {
+    clean = clean.slice(0, -8);
+  }
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1).trim();
+  }
+  return clean;
+};
+
+const cleanSupabaseKey = (key: string): string => {
+  if (!key) return '';
+  let clean = key.trim();
+  // Strip surrounding double/single quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || 
+      (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  return clean;
+};
+
+// Use literal text so Vite statically replaces it at build/runtime
+// @ts-ignore
+const buildUrl = import.meta.env?.VITE_SUPABASE_URL || '';
+// @ts-ignore
+const buildKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+
+const cleanBuildUrl = cleanSupabaseUrl(buildUrl);
+const cleanBuildKey = cleanSupabaseKey(buildKey);
+
+const fallbackUrl = 'https://umbavqavbopqajpvlpta.supabase.co';
+const fallbackKey = 'sb_publishable_YvN_P3YptuAKice53SgVpg_6PFYq2C0';
+
+let supabaseUrl = cleanBuildUrl || fallbackUrl;
+let supabaseAnonKey = cleanBuildKey || fallbackKey;
 
 // Check if localStorage is available (often blocked in iOS iframes)
 const isLocalStorageAvailable = () => {
@@ -15,10 +63,7 @@ const isLocalStorageAvailable = () => {
   }
 };
 
-let supabase: any;
-
-try {
-  console.log('Supabase: Initializing client...');
+const getOptions = () => {
   const options: any = {
     auth: {
       autoRefreshToken: true,
@@ -26,19 +71,32 @@ try {
       detectSessionInUrl: true
     }
   };
-
-  // If localStorage is blocked, use a no-op storage or memory storage
   if (!isLocalStorageAvailable()) {
     console.warn('Supabase: localStorage is not available. Auth persistence will be disabled.');
     options.auth.persistSession = false;
   }
+  return options;
+};
 
-  supabase = createClient(supabaseUrl, supabaseAnonKey, options);
+let actualSupabase: any = null;
 
+// Initialize actual Supabase client
+const initClient = (url: string, key: string) => {
+  const cleanUrl = cleanSupabaseUrl(url);
+  const cleanKey = cleanSupabaseKey(key);
+  
+  if (!cleanUrl || !cleanKey) {
+    console.warn('Supabase: cannot init client with blank URL or key');
+    return null;
+  }
+
+  console.log('Supabase: Initializing client with:', cleanUrl);
+  const client = createClient(cleanUrl, cleanKey, getOptions());
+  
   // Wrap from() to automatically track write operations per device session
-  const originalFrom = supabase.from;
-  supabase.from = function (table: string) {
-    const builder = originalFrom.call(supabase, table);
+  const originalFrom = client.from;
+  client.from = function (table: string) {
+    const builder = originalFrom.call(client, table);
     
     const originalInsert = builder.insert;
     builder.insert = function (...args: any[]) {
@@ -79,54 +137,103 @@ try {
     return builder;
   };
 
-  console.log('Supabase: Client initialized successfully');
-} catch (err) {
-  console.error('Supabase: Client creation failed:', err);
-  // Fallback mock to prevent app crash
-  supabase = {
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
-      signUp: () => Promise.reject(new Error('Supabase not initialized')),
-      signOut: () => Promise.resolve({ error: null }),
-    },
-    from: () => ({
-      select: () => ({ 
-        order: () => ({ 
-          on: () => ({
-            single: () => Promise.reject(new Error('Supabase not initialized')),
-          }),
-          single: () => Promise.reject(new Error('Supabase not initialized')),
-        }),
-        eq: () => ({
-          single: () => Promise.reject(new Error('Supabase not initialized')),
-          order: () => Promise.reject(new Error('Supabase not initialized')),
-        }),
-        single: () => Promise.reject(new Error('Supabase not initialized')),
-      }),
-      insert: () => Promise.reject(new Error('Supabase not initialized')),
-      update: () => Promise.reject(new Error('Supabase not initialized')),
-      delete: () => Promise.reject(new Error('Supabase not initialized')),
-      upsert: () => Promise.reject(new Error('Supabase not initialized')),
-    }),
-    channel: () => ({
-      on: () => ({
-        subscribe: (cb: any) => {
-          if (cb) cb('CHANNEL_ERROR');
-          return { unsubscribe: () => Promise.resolve() };
+  actualSupabase = client;
+  return client;
+};
+
+// Initialize synchronously with static bundle values if present
+if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project.supabase.co')) {
+  try {
+    initClient(supabaseUrl, supabaseAnonKey);
+  } catch (err) {
+    console.error('Supabase: Sync initialization failed', err);
+  }
+}
+
+// Fetch backend config asynchronously as a backup / override
+if (typeof window !== 'undefined') {
+  fetch('/api/config')
+    .then(res => res.json())
+    .then(config => {
+      const serverUrl = cleanSupabaseUrl(config.supabaseUrl);
+      const serverKey = cleanSupabaseKey(config.supabaseAnonKey);
+      
+      if (serverUrl && serverKey && 
+          !serverUrl.includes('your-project.supabase.co') && 
+          serverUrl !== 'https://umbavqavbopqajpvlpta.supabase.co') {
+        console.log('Supabase: Loaded configuration from backend successfully:', serverUrl);
+        initClient(serverUrl, serverKey);
+      } else {
+        console.warn('Supabase: Backend config did not provide valid custom credentials, keeping current connection.');
+        if (!actualSupabase) {
+          initClient(fallbackUrl, fallbackKey);
         }
+      }
+    })
+    .catch(err => {
+      console.error('Supabase: Failed to fetch backend config:', err);
+      if (!actualSupabase) {
+        initClient(fallbackUrl, fallbackKey);
+      }
+    });
+}
+
+// Fallback dummy object structure to prevent crash before actual client initialization
+const fallbackSupabase = {
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signInWithPassword: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    signUp: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    signOut: () => Promise.resolve({ error: null }),
+  },
+  from: () => ({
+    select: () => ({ 
+      order: () => ({ 
+        on: () => ({
+          single: () => Promise.reject(new Error('Supabase local initialization in progress')),
+        }),
+        single: () => Promise.reject(new Error('Supabase local initialization in progress')),
       }),
+      eq: () => ({
+        single: () => Promise.reject(new Error('Supabase local initialization in progress')),
+        order: () => Promise.reject(new Error('Supabase local initialization in progress')),
+      }),
+      single: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    }),
+    insert: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    update: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    delete: () => Promise.reject(new Error('Supabase local initialization in progress')),
+    upsert: () => Promise.reject(new Error('Supabase local initialization in progress')),
+  }),
+  channel: () => ({
+    on: () => ({
       subscribe: (cb: any) => {
         if (cb) cb('CHANNEL_ERROR');
         return { unsubscribe: () => Promise.resolve() };
       }
     }),
-    removeChannel: () => Promise.resolve(),
-    removeAllChannels: () => Promise.resolve(),
-  };
-}
+    subscribe: (cb: any) => {
+      if (cb) cb('CHANNEL_ERROR');
+      return { unsubscribe: () => Promise.resolve() };
+    }
+  }),
+  removeChannel: () => Promise.resolve(),
+  removeAllChannels: () => Promise.resolve(),
+};
+
+// Create a Proxy around actualSupabase with proper handling of all fields and functions
+export const supabase: any = new Proxy({}, {
+  get(target, prop) {
+    const active = actualSupabase || fallbackSupabase;
+    const value = active[prop];
+    if (typeof value === 'function') {
+      return value.bind(active);
+    }
+    return value;
+  }
+});
 
 // Singleton promise to prevent concurrent auth requests
 let currentUserPromise: Promise<any> | null = null;
@@ -241,5 +348,3 @@ export const getSafeUser = async (retryCount = 0): Promise<any> => {
 
   return currentUserPromise;
 };
-
-export { supabase };

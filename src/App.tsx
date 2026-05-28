@@ -487,7 +487,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.15 }}
-            className="min-h-screen bg-[#0B0B0B]"
+            className={`min-h-screen ${(!user && localStorage.getItem('capitae_is_guest') !== 'true') ? 'bg-background text-foreground light' : 'bg-background text-foreground'}`}
           >
             {user || localStorage.getItem('capitae_is_guest') === 'true' ? (
               <Dashboard key="dashboard-view" user={user || mockUser} />

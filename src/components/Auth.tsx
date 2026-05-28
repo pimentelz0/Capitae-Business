@@ -115,7 +115,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground light">
       <motion.div 
         key={isForgotPassword ? 'forgot-form' : (isSignUp ? 'signup-form' : 'signin-form')}
         initial={{ opacity: 0, y: 20 }}
@@ -123,7 +123,7 @@ export default function Auth() {
         className="w-full max-w-md space-y-8"
       >
         <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tighter text-primary">Capitae</h1>
+          <h1 className="text-4xl font-bold tracking-tighter text-primary">Capitae Business</h1>
           <p className="mt-2 text-muted font-medium">
             <span>
               {isForgotPassword 
@@ -240,40 +240,7 @@ export default function Auth() {
           </div>
         ) : (
           <>
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-white/5"></div>
-              <span className="flex-shrink mx-4 text-[10px] font-bold text-muted uppercase tracking-widest">ou continue com</span>
-              <div className="flex-grow border-t border-white/5"></div>
-            </div>
-
-            <button
-              type="button"
-              disabled={loading || googleLoading}
-              onClick={handleGoogleLogin}
-              className="w-full py-3 bg-secondary border border-white/10 hover:border-white/20 active:bg-secondary/70 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
-            >
-              {googleLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Chrome className="w-5 h-5 text-emerald-400" />
-                  <span>Google</span>
-                </>
-              )}
-            </button>
-
             <div className="text-center pt-2 flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.setItem('capitae_is_guest', 'true');
-                  window.location.reload();
-                }}
-                className="text-sm font-extrabold text-[#00C853] hover:text-[#00E676] hover:scale-[1.01] transition-all cursor-pointer select-none"
-              >
-                Entrar como Visitante (Sem Conta)
-              </button>
-
               <button
                 onClick={() => {
                   setError(null);

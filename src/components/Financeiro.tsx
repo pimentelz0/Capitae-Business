@@ -130,11 +130,13 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
           <p className="text-xs text-muted mt-1">Lançamento rápido de entradas/saídas e controle de duplicatas.</p>
         </div>
         <button
+          type="button"
           onClick={() => {
+            console.log('Financeiro: Lançar Transação button clicked! Current state:', showAddForm);
             setTipo('entrada');
             setShowAddForm(!showAddForm);
           }}
-          className="px-6 py-3.5 bg-primary hover:bg-opacity-95 text-background font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_0_20px_rgba(0,200,83,0.2)] flex items-center gap-2"
+          className="relative z-20 cursor-pointer px-6 py-3.5 bg-primary hover:bg-opacity-95 text-slate-950 font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_4px_20px_rgba(0,200,83,0.25)] active:scale-98 flex items-center gap-2"
         >
           <Plus className="w-4 h-4 font-black" />
           Lançar Transação
@@ -200,26 +202,22 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
         </div>
       </div>
 
-      {/* Dynamic Add Transaction Form Slide down */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden bg-secondary border border-foreground/5 rounded-3xl"
-          >
-            <div className="p-6 border-b border-foreground/5 flex justify-between items-center bg-background/60">
+      {/* Dynamic Add Transaction Form Modal Overlay */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-3xl bg-secondary border border-foreground/5 rounded-[32px] shadow-2xl overflow-hidden animate-fadeIn my-auto">
+            <div className="p-6 border-b border-foreground/5 flex justify-between items-center bg-background/60 relative z-10">
               <h3 className="font-bold text-base text-white">Lançar Nova Transação</h3>
               <button 
+                type="button"
                 onClick={() => setShowAddForm(false)}
-                className="text-xs text-muted hover:text-white"
+                className="text-xs text-muted hover:text-white bg-foreground/5 px-3 py-1.5 rounded-xl transition-all hover:bg-foreground/10"
               >
                 Cancelar
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto relative z-10">
               <div className="space-y-4">
                 {/* Type Selection */}
                 <div className="space-y-2">
@@ -260,6 +258,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                     step="0.01"
                     required
                     placeholder="0,00"
+                    value={valor === 0 ? '' : valor}
                     onChange={(e) => setValor(parseFloat(e.target.value) || 0)}
                     className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary transition-all font-bold text-base"
                   />
@@ -361,9 +360,9 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                 </div>
               </div>
             </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* Main Tabs (Fluxo x Contas a Pagar x Contas a Receber) */}
       <div className="bg-secondary border border-foreground/5 rounded-[32px] overflow-hidden">

@@ -107,14 +107,16 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
           <p className="text-xs text-muted mt-1">Estoque inteligente com alertas automáticos de reposição para comércios.</p>
         </div>
         <button
+          type="button"
           onClick={() => {
+            console.log('Estoque: Cadastrar Produto button clicked! Current state:', showAddForm);
             if (showAddForm) {
               handleCancel();
             } else {
               setShowAddForm(true);
             }
           }}
-          className="px-6 py-3.5 bg-primary hover:bg-opacity-95 text-background font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_0_20px_rgba(0,200,83,0.2)] flex items-center gap-2"
+          className="relative z-20 cursor-pointer px-6 py-3.5 bg-primary hover:bg-opacity-95 text-slate-950 font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_4px_20px_rgba(0,200,83,0.25)] active:scale-98 flex items-center gap-2"
         >
           <Plus className="w-4 h-4 font-black" />
           Cadastrar Produto
@@ -170,28 +172,24 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
         </div>
       </div>
 
-      {/* Slide down Product Entry / Edit Form */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden bg-secondary border border-foreground/5 rounded-3xl"
-          >
-            <div className="p-6 border-b border-foreground/5 bg-background/60 flex justify-between items-center">
+      {/* Slide down Product Entry / Edit Form Overlay Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-3xl bg-secondary border border-foreground/5 rounded-[32px] shadow-2xl overflow-hidden animate-fadeIn my-auto">
+            <div className="p-6 border-b border-foreground/5 bg-background/60 flex justify-between items-center relative z-10">
               <h3 className="font-bold text-base text-white">
                 {editingProdutoId ? `Editar Produto: ${nome}` : 'Cadastrar Novo Produto'}
               </h3>
               <button 
+                type="button"
                 onClick={handleCancel}
-                className="text-xs text-muted hover:text-white"
+                className="text-xs text-muted hover:text-white bg-foreground/5 px-3 py-1.5 rounded-xl transition-all hover:bg-foreground/10"
               >
                 Cancelar
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[80vh] overflow-y-auto relative z-10">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs text-muted font-bold uppercase">Nome do Produto*</label>
@@ -291,9 +289,9 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
                 </div>
               </div>
             </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* Product List Table */}
       <div className="bg-secondary border border-foreground/5 rounded-[32px] overflow-hidden">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSafeUser, supabase } from '../lib/supabase';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, Camera, Save, Loader2, LogOut, Mail, Info, CheckCircle2, Zap, Lock, AlertTriangle } from 'lucide-react';
 
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -58,6 +58,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     fetchProfile().catch(err => console.error('Profile: Error in fetchProfile:', err));
@@ -209,11 +210,24 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
     }
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const executeSignOut = async () => {
+    setShowLogoutConfirm(false);
+    if (user.id === 'guest_user') {
+      localStorage.removeItem('capitae_is_guest');
+      window.location.reload();
+      return;
+    }
     try {
       await supabase.auth.signOut();
+      window.location.reload();
     } catch (err) {
       console.error('Profile: Error signing out:', err);
+      // Fallback reload in case of any issues
+      window.location.reload();
     }
   };
 
@@ -448,6 +462,54 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
           Suas informações de perfil são privadas e usadas apenas para personalizar sua experiência no Capitae e ajudar o Capy a te dar conselhos melhores.
         </p>
       </div>
+
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl text-center space-y-6"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto text-red-500">
+                <LogOut className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white">Sair da Conta</h3>
+                <p className="text-sm text-muted">
+                  {user.id === 'guest_user'
+                    ? 'Deseja realmente sair do modo visitante? Seus dados continuarão salvos localmente.'
+                    : 'Tem certeza de que deseja sair de sua conta?'}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 py-3.5 bg-foreground/5 hover:bg-foreground/10 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={executeSignOut}
+                  className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                >
+                  Sair
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

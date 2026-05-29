@@ -36,10 +36,11 @@ import {
 
 interface NotificationCenterProps {
   userId: string;
+  theme?: 'light' | 'dark';
   onRedirectToTab: (tab: 'home' | 'bills' | 'reports' | 'gamification' | 'forecast' | 'profile') => void;
 }
 
-export default function NotificationCenter({ userId, onRedirectToTab }: NotificationCenterProps) {
+export default function NotificationCenter({ userId, theme = 'light', onRedirectToTab }: NotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [settings, setSettings] = useState<NotificationSettings>(() => getNotificationSettings(userId));
@@ -231,7 +232,7 @@ export default function NotificationCenter({ userId, onRedirectToTab }: Notifica
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsOpen(false)}
-                className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[90]"
+                className={`fixed inset-0 bg-black/55 backdrop-blur-sm z-[90] ${theme === 'light' ? 'light' : ''}`}
               />
 
               {/* Custom Drawer */}
@@ -240,7 +241,7 @@ export default function NotificationCenter({ userId, onRedirectToTab }: Notifica
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 180 }}
-                className="fixed inset-y-0 right-0 h-full h-[100dvh] max-h-screen w-full max-w-md bg-secondary border-l border-foreground/5 z-[100] flex flex-col shadow-2xl overflow-hidden"
+                className={`fixed inset-y-0 right-0 h-full h-[100dvh] max-h-screen w-full max-w-md bg-secondary border-l border-foreground/5 z-[100] flex flex-col shadow-2xl overflow-hidden ${theme === 'light' ? 'light' : ''}`}
               >
                 {/* Header */}
                 <div className="pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-6 px-6 border-b border-foreground/5 flex items-center justify-between shrink-0">
@@ -418,7 +419,7 @@ export default function NotificationCenter({ userId, onRedirectToTab }: Notifica
                       <div className="pt-4">
                         <button 
                           onClick={() => setShowSettings(false)}
-                          className="w-full py-3 bg-primary text-background rounded-xl font-bold text-xs uppercase tracking-wider"
+                          className="w-full py-3 bg-primary text-slate-950 rounded-xl font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-opacity"
                         >
                           Pronto
                         </button>

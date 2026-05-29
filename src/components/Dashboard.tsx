@@ -88,6 +88,7 @@ export default function Dashboard({ user }: DashboardProps) {
   // Modals
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showTermsConsent, setShowTermsConsent] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Load from local Cache scoped per user
   useEffect(() => {
@@ -102,8 +103,10 @@ export default function Dashboard({ user }: DashboardProps) {
         if (cachedProds) {
           setProdutos(JSON.parse(cachedProds));
         } else {
-          setProdutos(INITIAL_PRODUCTS);
-          localStorage.setItem(prodKey, JSON.stringify(INITIAL_PRODUCTS));
+          // For real logged in users, default to empty list, only seed for guest user
+          const initialProds = user.id === 'guest_user' ? INITIAL_PRODUCTS : [];
+          setProdutos(initialProds);
+          localStorage.setItem(prodKey, JSON.stringify(initialProds));
         }
 
         // Transactions
@@ -111,16 +114,19 @@ export default function Dashboard({ user }: DashboardProps) {
         if (cachedTrans) {
           setTransacoes(JSON.parse(cachedTrans));
         } else {
-          const seeds = generateInitialTransactions();
-          setTransacoes(seeds);
-          localStorage.setItem(transKey, JSON.stringify(seeds));
+          // For real logged in users, default to empty list, only seed for guest user
+          const initialTrans = user.id === 'guest_user' ? generateInitialTransactions() : [];
+          setTransacoes(initialTrans);
+          localStorage.setItem(transKey, JSON.stringify(initialTrans));
         }
 
-        // Onboarding / terms check
+        // Setup Onboarding & terms display rules
+        const termsKey = `capitae_accepted_terms_${user.id}`;
         const seenOnboarding = localStorage.getItem(onboardingKey) === 'true';
-        if (!seenOnboarding) {
-          setShowOnboarding(true);
-        }
+        const acceptedTerms = localStorage.getItem(termsKey) === 'true';
+        
+        let finalShowOnboarding = !seenOnboarding;
+        let finalShowTermsConsent = !acceptedTerms;
 
         // Supabase Profile load
         if (user.id === 'guest_user') {
@@ -150,16 +156,65 @@ export default function Dashboard({ user }: DashboardProps) {
 
         if (dbProfile) {
           setProfile(dbProfile);
+          
+          // If the profile says they have seen onboarding, don't show it even if localStorage was empty
           if (dbProfile.has_seen_onboarding) {
-            setShowOnboarding(false);
+            finalShowOnboarding = false;
+            localStorage.setItem(onboardingKey, 'true');
           }
-          if (!dbProfile.accepted_terms) {
-            setShowTermsConsent(true);
+          
+          // Check if accepted terms in db
+          if (dbProfile.accepted_terms) {
+            finalShowTermsConsent = false;
+            localStorage.setItem(termsKey, 'true');
+          } else {
+            // Only show terms if not accepted locally either
+            finalShowTermsConsent = !acceptedTerms;
           }
         } else {
-          // Fallback if profiles is missing
-          setShowTermsConsent(true);
+          // Fallback if profiles table row is missing (first login / brand new user signup)
+          // Trust localStorage to stay local-secure if already completed
+          finalShowTermsConsent = !acceptedTerms;
+          finalShowOnboarding = !seenOnboarding;
+
+          // Try to upsert/seed default profile in background so the row is ready for future updates
+          try {
+            const initialProf = {
+              id: user.id,
+              display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'Usuário',
+              avatar_url: user.user_metadata?.avatar_url || '',
+              bio: 'Minhas finanças sob controle.',
+              xp: 0,
+              level: 'Iniciante',
+              coins: 10,
+              streak: 1,
+              monthly_income: 0,
+              payday: 5,
+              pay_frequency: 'mensal',
+              pay_days: '',
+              fixed_costs: 0,
+              perc_essentials: 50,
+              perc_leisure: 30,
+              perc_investment: 20,
+              has_seen_onboarding: seenOnboarding,
+              accepted_terms: acceptedTerms,
+              updated_at: new Date().toISOString()
+            };
+            
+            const { error: upsertErr } = await supabase
+              .from('profiles')
+              .upsert(initialProf, { onConflict: 'id' });
+              
+            if (!upsertErr) {
+              setProfile(initialProf);
+            }
+          } catch (e) {
+            console.error('Error seeding default profile row:', e);
+          }
         }
+
+        setShowOnboarding(finalShowOnboarding);
+        setShowTermsConsent(finalShowTermsConsent);
       } catch (err) {
         console.error('Dashboard cache loader error:', err);
       } finally {
@@ -238,24 +293,39 @@ export default function Dashboard({ user }: DashboardProps) {
     setShowOnboarding(false);
     localStorage.setItem(`capitae_seen_onboarding_${user.id}`, 'true');
     try {
-      await supabase.from('profiles').update({ has_seen_onboarding: true }).eq('id', user.id);
-    } catch (e) {}
+      await supabase.from('profiles').upsert({ 
+        id: user.id, 
+        has_seen_onboarding: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+    } catch (e) {
+      console.error('Error saving onboarding state:', e);
+    }
   };
 
   const handleCompleteTermsConsent = () => {
     setShowTermsConsent(false);
+    localStorage.setItem(`capitae_accepted_terms_${user.id}`, 'true');
+    setProfile((prev: any) => prev ? { ...prev, accepted_terms: true } : prev);
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    setShowLogoutConfirm(true);
+    setIsMenuOpen(false); // Close menu when showing confirm
+  };
+
+  const executeSignOut = async () => {
+    setShowLogoutConfirm(false);
     if (user.id === 'guest_user') {
-      if (confirm('Deseja realmente sair do modo visitante? (Seus dados locais continuarão salvos com segurança neste navegador)')) {
-        localStorage.removeItem('capitae_is_guest');
-        window.location.reload();
-      }
+      localStorage.removeItem('capitae_is_guest');
+      window.location.reload();
       return;
     }
-    if (confirm('Deseja realmente sair da sua conta?')) {
+    try {
       await supabase.auth.signOut();
+      window.location.reload();
+    } catch (e) {
+      console.error('Error signing out:', e);
       window.location.reload();
     }
   };
@@ -364,6 +434,7 @@ export default function Dashboard({ user }: DashboardProps) {
             
             <NotificationCenter 
               userId={user.id} 
+              theme={theme}
               onRedirectToTab={(tab) => {
                 if ((tab as string) === 'expenses' || tab === 'bills') setActiveTab('financeiro');
               }} 
@@ -415,7 +486,7 @@ export default function Dashboard({ user }: DashboardProps) {
               <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-8 overscroll-contain">
                 <div className="space-y-1.5">
                   {[
-                    { id: 'pdv', label: 'PDV / Caixa Diário', icon: <ShoppingCart /> },
+                    { id: 'pdv', label: 'Caixa', icon: <ShoppingCart /> },
                     { id: 'financeiro', label: 'Fluxo de Caixa', icon: <TrendingUp /> },
                     { id: 'estoque', label: 'Controle de Estoque', icon: <Package /> },
                     { id: 'relatorios', label: 'Painel de Relatórios', icon: <BarChart3 /> },
@@ -467,7 +538,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
       {/* Re-aligned Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-foreground/5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex justify-around items-center z-50">
-        <NavButton active={activeTab === 'pdv'} onClick={() => setActiveTab('pdv')} icon={<ShoppingCart />} label="PDV" />
+        <NavButton active={activeTab === 'pdv'} onClick={() => setActiveTab('pdv')} icon={<ShoppingCart />} label="Caixa" />
         <NavButton active={activeTab === 'financeiro'} onClick={() => setActiveTab('financeiro')} icon={<TrendingUp />} label="Financeiro" />
         <NavButton active={activeTab === 'estoque'} onClick={() => setActiveTab('estoque')} icon={<Package />} label="Estoque" />
         <NavButton active={activeTab === 'relatorios'} onClick={() => setActiveTab('relatorios')} icon={<BarChart3 />} label="Relatórios" />
@@ -486,6 +557,54 @@ export default function Dashboard({ user }: DashboardProps) {
         userEmail={user.email || ''}
         onAcceptComplete={handleCompleteTermsConsent}
       />
+
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute inset-0 bg-background/85 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl text-center space-y-6"
+            >
+              <div className="w-16 h-16 bg-red-400/10 rounded-2xl flex items-center justify-center mx-auto text-red-500">
+                <LogOut className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white">Sair da Conta</h3>
+                <p className="text-sm text-muted">
+                  {user.id === 'guest_user'
+                    ? 'Deseja realmente sair do modo visitante? Seus dados continuarão salvos localmente.'
+                    : 'Tem certeza de que deseja sair de sua conta?'}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 py-3.5 bg-foreground/5 hover:bg-foreground/10 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={executeSignOut}
+                  className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                >
+                  Sair
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -32,23 +32,25 @@ export default function TermsConsentModal({ isOpen, userId, userEmail, onAcceptC
     setErrorVisible('');
 
     try {
-      // 1. Update the metadata first or attempt directly to update DB columns
       const acceptedAt = new Date().toISOString();
+      
+      // Store in localStorage immediately as a reliable fallback/cache
+      localStorage.setItem(`capitae_accepted_terms_${userId}`, 'true');
+
+      // 1. Upsert directly to profiles table so the row is guaranteed to exist with accept flags set
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: userId,
           accepted_terms: true,
           accepted_terms_at: acceptedAt,
           updated_at: acceptedAt
-        })
-        .eq('id', userId);
+        }, { onConflict: 'id' });
 
       if (error) {
-        console.warn('DB Update Error (columns might not exist yet):', error.message);
+        console.warn('DB Upsert Error (columns might not exist yet):', error.message);
         
-        // Let's store a fallback in local storage so the user is never stuck in the UI,
-        // and tell the user that the save was stored locally, while recommending they run the SQL script.
-        // But first, let's check if we can update the user metadata as well for redundant backup!
+        // Let's check if we can update the user metadata as well for redundant backup!
         const { error: metaError } = await supabase.auth.updateUser({
           data: {
             accepted_terms: true,

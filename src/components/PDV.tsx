@@ -19,6 +19,15 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [recentTotal, setRecentTotal] = useState(0);
 
+  // Revenda Rápida States
+  const [pdvMode, setPdvMode] = useState<'estoque' | 'revenda'>('estoque');
+  const [revendaNome, setRevendaNome] = useState('');
+  const [revendaCusto, setRevendaCusto] = useState<number | ''>('');
+  const [revendaVenda, setRevendaVenda] = useState<number | ''>('');
+  const [revendaQtd, setRevendaQtd] = useState<number>(1);
+  const [revendaMeio, setRevendaMeio] = useState<string>('Pix');
+  const [registrarCusto, setRegistrarCusto] = useState<boolean>(true);
+
   // Categories extraction
   const categories = ['Todos', ...Array.from(new Set(produtos.map(p => p.categoria)))];
 
@@ -112,13 +121,68 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     setTimeout(() => setSaleSuccess(false), 3000);
   };
 
+  // Finalizar Revenda Rápida (sem estoque)
+  const handleFinalizeRevenda = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!revendaNome.trim()) {
+      alert('Por favor, informe o nome do produto.');
+      return;
+    }
+    const valorVenda = Number(revendaVenda);
+    if (!valorVenda || valorVenda <= 0) {
+      alert('Por favor, informe um preço de revenda válido.');
+      return;
+    }
+
+    const valorCusto = Number(revendaCusto) || 0;
+    const totalVendaFinal = valorVenda * revendaQtd;
+    const totalCustoFinal = valorCusto * revendaQtd;
+
+    // 1. Lança a entrada da venda no financeiro
+    onAddTransacao({
+      tipo: 'entrada',
+      descricao: `[Revenda Direta] ${revendaQtd}x ${revendaNome} (Venda: R$ ${valorVenda.toFixed(2)} un)`,
+      valor: totalVendaFinal,
+      categoria: 'Vendas (PDV)',
+      data: new Date().toISOString().split('T')[0],
+      tipo_registro: 'imediato',
+      status: 'pago',
+      meio_pagamento: revendaMeio
+    });
+
+    // 2. Se optado, lança a saída automática do custo da compra
+    if (registrarCusto && valorCusto > 0) {
+      onAddTransacao({
+        tipo: 'saida',
+        descricao: `[Custo de Revenda] ${revendaQtd}x ${revendaNome} (Custo: R$ ${valorCusto.toFixed(2)} un)`,
+        valor: totalCustoFinal,
+        categoria: 'Aquisição de Mercadorias',
+        data: new Date().toISOString().split('T')[0],
+        tipo_registro: 'imediato',
+        status: 'pago',
+        meio_pagamento: revendaMeio
+      });
+    }
+
+    setRecentTotal(totalVendaFinal);
+    setSaleSuccess(true);
+
+    // Limpar formulário de revenda
+    setRevendaNome('');
+    setRevendaCusto('');
+    setRevendaVenda('');
+    setRevendaQtd(1);
+
+    setTimeout(() => setSaleSuccess(false), 4000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Visual Header / Caixa Banner */}
       <div className="relative overflow-hidden bg-secondary border border-foreground/5 p-6 rounded-[32px] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-3 py-1.5 rounded-full mb-2 inline-block">
-            Frente de Caixa (PDV)
+            Frente de Caixa
           </span>
           <h1 className="text-3xl font-black tracking-tight text-white mt-1">Venda Rápida</h1>
           <p className="text-xs text-muted mt-1">Abata estoque e lance no caixa diário em segundos.</p>
@@ -162,92 +226,307 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side: Product Selector (7 cols) */}
+        {/* Left Side: Product Selector or Resale Form */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-secondary border border-foreground/5 p-4 rounded-3xl space-y-3">
-            {/* Search and Filters */}
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-              <input 
-                type="text"
-                placeholder="Pesquisar produto pelo nome ou categoria..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-background border border-foreground/5 pl-11 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white placeholder-muted"
-              />
-            </div>
-
-            {/* Category tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                    selectedCategory === cat 
-                      ? 'bg-primary text-background' 
-                      : 'bg-background hover:bg-foreground/5 text-muted hover:text-white'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+          
+          {/* Sub-tabs to choose either Product Sales or Quick Direct Resale */}
+          <div className="flex bg-background/40 p-1.5 rounded-2xl border border-foreground/5 gap-1">
+            <button
+              type="button"
+              onClick={() => setPdvMode('estoque')}
+              className={`flex-1 py-3 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+                pdvMode === 'estoque'
+                  ? 'bg-secondary text-white shadow-sm border border-foreground/5'
+                  : 'text-muted hover:text-white'
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5 text-primary" />
+              Vender do Estoque
+            </button>
+            <button
+              type="button"
+              onClick={() => setPdvMode('revenda')}
+              className={`flex-1 py-3 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+                pdvMode === 'revenda'
+                  ? 'bg-secondary text-white shadow-sm border border-foreground/5'
+                  : 'text-muted hover:text-white'
+              }`}
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-primary" />
+              Revenda Rápida (Sem Estoque)
+            </button>
           </div>
 
-          {/* Product Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {filteredProducts.length === 0 ? (
-              <div className="col-span-full bg-secondary/50 border border-dashed border-foreground/5 p-12 rounded-3xl text-center text-muted">
-                <AlertCircle className="w-10 h-10 text-muted/40 mx-auto mb-3" />
-                <p className="text-sm font-medium">Nenhum produto encontrado.</p>
-                <p className="text-xs mt-1">Adicione itens no Controle de Estoque primeiro.</p>
+          {pdvMode === 'estoque' ? (
+            <>
+              <div className="bg-secondary border border-foreground/5 p-4 rounded-3xl space-y-3">
+                {/* Search and Filters */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                  <input 
+                    type="text"
+                    placeholder="Pesquisar produto pelo nome ou categoria..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-background border border-foreground/5 pl-11 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white placeholder-muted"
+                  />
+                </div>
+
+                {/* Category tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        selectedCategory === cat 
+                          ? 'bg-primary text-background' 
+                          : 'bg-background hover:bg-foreground/5 text-muted hover:text-white'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              filteredProducts.map(p => {
-                const isOutOfStock = p.quantidade <= 0;
-                const isLowStock = p.quantidade <= p.estoque_minimo && !isOutOfStock;
-                
-                return (
-                  <motion.button
-                    disabled={isOutOfStock}
-                    key={p.id}
-                    onClick={() => addToCart(p)}
-                    whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
-                    className={`bg-secondary border text-left p-4 rounded-3xl flex flex-col justify-between h-36 transition-all ${
-                      isOutOfStock 
-                        ? 'opacity-40 border-foreground/5 cursor-not-allowed' 
-                        : 'border-foreground/5 hover:border-primary/20'
-                    }`}
-                  >
+
+              {/* Product Cards List */}
+              <div className="flex flex-col gap-2">
+                {filteredProducts.length === 0 ? (
+                  <div className="bg-secondary/50 border border-dashed border-foreground/5 p-12 rounded-3xl text-center text-muted">
+                    <AlertCircle className="w-10 h-10 text-muted/40 mx-auto mb-3" />
+                    <p className="text-sm font-medium">Nenhum produto encontrado.</p>
+                    <p className="text-xs mt-1">Adicione itens no Controle de Estoque primeiro.</p>
+                  </div>
+                ) : (
+                  filteredProducts.map(p => {
+                    const isOutOfStock = p.quantidade <= 0;
+                    const isLowStock = p.quantidade <= p.estoque_minimo && !isOutOfStock;
+                    
+                    return (
+                      <motion.button
+                        disabled={isOutOfStock}
+                        key={p.id}
+                        type="button"
+                        onClick={() => addToCart(p)}
+                        whileTap={{ scale: isOutOfStock ? 1 : 0.99 }}
+                        className={`group w-full bg-secondary border text-left p-3.5 px-4 rounded-2xl flex items-center justify-between transition-all gap-4 ${
+                          isOutOfStock 
+                            ? 'opacity-40 border-foreground/5 cursor-not-allowed' 
+                            : 'border-foreground/5 hover:border-primary/20 hover:bg-foreground/5 cursor-pointer'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[9px] uppercase font-bold text-muted bg-background/60 px-2 py-0.5 rounded-md">
+                              {p.categoria}
+                            </span>
+                            {isLowStock && (
+                              <span className="text-[9px] text-yellow-500 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded">
+                                Estoque Baixo
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-sm font-bold text-foreground truncate">{p.nome}</h4>
+                        </div>
+
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="text-right">
+                            <p className="text-base font-extrabold text-primary">
+                              R$ {isPrivateMode ? '•••' : p.preco_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            {isOutOfStock ? (
+                              <span className="text-[9px] text-red-500 font-bold bg-red-500/10 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                Sem Estoque
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-medium text-muted">
+                                Qtd: {p.quantidade} un
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="w-8 h-8 bg-primary/10 text-primary group-hover:bg-primary group-hover:text-background rounded-xl flex items-center justify-center transition-colors shrink-0">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </motion.button>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            /* Revenda Rápida Direct Mode Form */
+            <form onSubmit={handleFinalizeRevenda} className="bg-secondary border border-foreground/5 p-6 rounded-[32px] space-y-6">
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                  Nova Revenda sem Estoque
+                </h3>
+                <p className="text-xs text-muted mt-1">Lançamento direto de produtos de oportunidade sem precisar atualizar o estoque.</p>
+              </div>
+
+              <div className="space-y-4">
+                {/* Nome do Produto */}
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase tracking-wider block">Nome do Produto</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Camiseta Importada Revenda"
+                    value={revendaNome}
+                    onChange={(e) => setRevendaNome(e.target.value)}
+                    className="w-full bg-background border border-foreground/5 px-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white placeholder-muted"
+                  />
+                </div>
+
+                {/* Custo e Venda */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Custo de Compra (un)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">R$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        value={revendaCusto || ''}
+                        onChange={(e) => setRevendaCusto(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        className="w-full bg-background border border-foreground/5 pl-10 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Preço de Revenda (un)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">R$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="0,00"
+                        value={revendaVenda || ''}
+                        onChange={(e) => setRevendaVenda(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        className="w-full bg-background border border-foreground/5 pl-10 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-primary font-black"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profit Margin Calculations Info Box */}
+                {revendaVenda !== '' && revendaVenda > 0 && (
+                  <div className="p-4 bg-background/40 border border-foreground/5 rounded-2xl grid grid-cols-3 gap-2">
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-muted bg-background px-2 py-0.5 rounded-md">
-                        {p.categoria}
-                      </span>
-                      <h4 className="text-sm font-bold text-white line-clamp-2 mt-1.5">{p.nome}</h4>
+                      <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Lucro Unitário</p>
+                      <p className="text-sm font-black text-primary mt-1">
+                        R$ {isPrivateMode ? '•••' : (Number(revendaVenda) - (Number(revendaCusto) || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
                     </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <div>
-                        {isOutOfStock ? (
-                          <span className="text-[9px] text-red-500 font-bold bg-red-500/10 px-1.5 py-0.5 rounded">Sem Estoque</span>
-                        ) : (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLowStock ? 'text-yellow-500 bg-yellow-500/10' : 'text-muted'}`}>
-                            Qtd: {p.quantidade} un
-                          </span>
-                        )}
-                        <p className="text-base font-extrabold text-primary mt-1">
-                          R$ {isPrivateMode ? '•••' : p.preco_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
+                    <div>
+                      <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Margem de Lucro</p>
+                      <p className="text-sm font-black text-[#00C853] mt-1">
+                        {(() => {
+                          const c = Number(revendaCusto) || 0;
+                          const v = Number(revendaVenda);
+                          if (v <= 0) return '0%';
+                          return `${Math.round(((v - c) / v) * 100)}%`;
+                        })()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Markup / Retorno</p>
+                      <p className="text-sm font-black text-blue-400 mt-1">
+                        {(() => {
+                          const c = Number(revendaCusto) || 0;
+                          const v = Number(revendaVenda);
+                          if (c <= 0) return '100%';
+                          return `${Math.round(((v - c) / c) * 100)}%`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Quantidade e Meio de Pagamento */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Quantidade</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRevendaQtd(Math.max(1, revendaQtd - 1))}
+                        className="w-11 h-11 bg-background text-muted hover:text-white rounded-xl flex items-center justify-center border border-foreground/5"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <div className="flex-1 bg-background rounded-xl border border-foreground/5 h-11 flex items-center justify-center text-sm font-extrabold text-white">
+                        {revendaQtd}
                       </div>
-                      <div className="w-8 h-8 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl flex items-center justify-center transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => setRevendaQtd(revendaQtd + 1)}
+                        className="w-11 h-11 bg-background text-muted hover:text-white rounded-xl flex items-center justify-center border border-foreground/5"
+                      >
                         <Plus className="w-4 h-4" />
-                      </div>
+                      </button>
                     </div>
-                  </motion.button>
-                );
-              })
-            )}
-          </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Meio de Pagamento</label>
+                    <select
+                      value={revendaMeio}
+                      onChange={(e) => setRevendaMeio(e.target.value)}
+                      className="w-full h-11 bg-background border border-foreground/5 px-4 rounded-xl text-sm text-foreground outline-none focus:border-primary transition-all font-bold"
+                    >
+                      <option value="Pix">Pix</option>
+                      <option value="Cartão">Cartão</option>
+                      <option value="Dinheiro">Dinheiro</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Toggle registrar custo de compra */}
+                {revendaCusto !== '' && Number(revendaCusto) > 0 && (
+                  <label className="flex items-start gap-3 cursor-pointer p-3 bg-background/20 rounded-2xl border border-foreground/5 text-xs text-muted hover:text-white transition-all select-none">
+                    <input
+                      type="checkbox"
+                      checked={registrarCusto}
+                      onChange={(e) => setRegistrarCusto(e.target.checked)}
+                      className="rounded border-foreground/10 text-primary focus:ring-primary bg-background w-4 h-4 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold block text-white">Lançar custo de compra como saída</span>
+                      Gera uma saída automática de R$ {isPrivateMode ? '•••' : ((Number(revendaCusto) || 0) * revendaQtd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no caixa.
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              {/* Total and Launch Button */}
+              <div className="pt-4 border-t border-foreground/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <span className="text-xs text-muted font-bold uppercase tracking-wider block">Valor Total Recebido</span>
+                  <p className="text-2xl font-black text-primary">
+                    R$ {isPrivateMode ? '•••' : ((Number(revendaVenda) || 0) * revendaQtd).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-6 py-3.5 bg-primary hover:bg-opacity-95 text-slate-950 font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_4px_20px_rgba(0,200,83,0.25)] flex items-center justify-center gap-2 active:scale-98"
+                >
+                  <Check className="w-4 h-4 font-black" />
+                  Lançar Revenda
+                </button>
+              </div>
+            </form>
+          )}
+
         </div>
 
         {/* Right Side: Cart / Checkout (5 cols) */}

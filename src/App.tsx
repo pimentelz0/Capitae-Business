@@ -365,14 +365,14 @@ export default function App() {
           filter: "blur(10px)"
         }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed inset-0 z-50 min-h-screen bg-[#0B0B0B] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden"
+        className="fixed inset-0 z-50 min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden animate-fadeIn"
       >
         {/* Animated Background Pulse */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
-          className="absolute w-80 h-80 bg-[#00C853]/10 rounded-full blur-[100px] pointer-events-none"
+          className="absolute w-80 h-80 bg-[#00C853]/15 rounded-full blur-[100px] pointer-events-none"
         />
 
         {/* Content Container */}
@@ -382,7 +382,7 @@ export default function App() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 120, damping: 15, delay: 0.1 }}
-            className="text-5xl font-black tracking-tighter text-white select-none pointer-events-none mb-2"
+            className="text-5xl font-black tracking-tighter text-slate-950 select-none pointer-events-none mb-2 font-sans"
           >
             Capitae Business
           </motion.h1>
@@ -391,13 +391,13 @@ export default function App() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-muted text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-80"
+            className="text-slate-500 text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-90"
           >
             Gestão inteligente para pequenas empresas e autônomos
           </motion.p>
 
           {/* Horizontal tracking progress line */}
-          <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden mt-8 relative">
+          <div className="w-48 h-1 bg-slate-200 rounded-full overflow-hidden mt-8 relative">
             <motion.div 
               initial={{ x: "-100%" }}
               animate={loading ? { x: ["-100%", "200%"] } : { x: "100%" }}
@@ -415,9 +415,9 @@ export default function App() {
 
           <motion.p
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
+            animate={{ opacity: 0.8 }}
             transition={{ duration: 0.4, delay: 0.7 }}
-            className="text-[11px] text-muted font-medium mt-3"
+            className="text-[11px] text-slate-600 font-bold mt-3"
           >
             {loading ? "Sincronizando dados..." : "Iniciando..."}
           </motion.p>
@@ -437,7 +437,7 @@ export default function App() {
                     setLoading(false);
                     setSplashTimeoutFinished(true);
                   }}
-                  className="px-5 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-white/5 rounded-xl text-xs font-bold text-muted hover:text-white transition-all hover:scale-102"
+                  className="px-5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all hover:scale-102 shadow-sm"
                 >
                   Pular Carregamento
                 </button>
@@ -454,10 +454,10 @@ export default function App() {
   if (isCallback) {
     return (
       <ErrorBoundary>
-        <div className="min-h-screen bg-[#0B0B0B] flex flex-col items-center justify-center p-6 text-center">
+        <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-6 text-center">
           <div className="w-12 h-12 border-4 border-[#00C853] border-t-transparent rounded-full animate-spin mb-6"></div>
-          <h2 className="text-white font-bold text-xl mb-2">Autenticação efetuada com sucesso!</h2>
-          <p className="text-muted text-sm max-w-xs">Fechando esta janela automaticamente...</p>
+          <h2 className="text-slate-950 font-bold text-xl mb-2">Autenticação efetuada com sucesso!</h2>
+          <p className="text-slate-500 text-sm max-w-xs">Fechando esta janela automaticamente...</p>
         </div>
       </ErrorBoundary>
     );

@@ -237,12 +237,13 @@ export default function Dashboard({ user }: DashboardProps) {
   };
 
   // State operations handlers
-  const handleAddTransacao = (newT: Omit<Transacao, 'id'>) => {
-    const tWithId: Transacao = {
-      ...newT,
+  const handleAddTransacao = (newT: Omit<Transacao, 'id'> | Omit<Transacao, 'id'>[]) => {
+    const items = Array.isArray(newT) ? newT : [newT];
+    const itemsWithId = items.map(t => ({
+      ...t,
       id: `t_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`
-    };
-    const updated = [tWithId, ...transacoes];
+    }));
+    const updated = [...itemsWithId, ...transacoes];
     saveTransactionsToCache(updated);
   };
 

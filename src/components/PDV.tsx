@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface PDVProps {
   produtos: Produto[];
-  onAddTransacao: (transacao: Omit<Transacao, 'id'>) => void;
+  onAddTransacao: (transacao: Omit<Transacao, 'id'> | Omit<Transacao, 'id'>[]) => void;
   onUpdateProdutoQuantidade: (id: string, novaQuantidade: number) => void;
   isPrivateMode: boolean;
 }
@@ -138,8 +138,10 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     const totalVendaFinal = valorVenda * revendaQtd;
     const totalCustoFinal = valorCusto * revendaQtd;
 
+    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
+
     // 1. Lança a entrada da venda no financeiro
-    onAddTransacao({
+    transacoesParaAdicionar.push({
       tipo: 'entrada',
       descricao: `[Revenda Direta] ${revendaQtd}x ${revendaNome} (Venda: R$ ${valorVenda.toFixed(2)} un)`,
       valor: totalVendaFinal,
@@ -152,7 +154,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
 
     // 2. Se optado, lança a saída automática do custo da compra
     if (registrarCusto && valorCusto > 0) {
-      onAddTransacao({
+      transacoesParaAdicionar.push({
         tipo: 'saida',
         descricao: `[Custo de Revenda] ${revendaQtd}x ${revendaNome} (Custo: R$ ${valorCusto.toFixed(2)} un)`,
         valor: totalCustoFinal,
@@ -163,6 +165,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
         meio_pagamento: revendaMeio
       });
     }
+
+    onAddTransacao(transacoesParaAdicionar);
 
     setRecentTotal(totalVendaFinal);
     setSaleSuccess(true);

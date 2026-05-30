@@ -1,7 +1,7 @@
 {
-  "name": "Capitae Finance",
-  "short_name": "Capitae",
-  "description": "Gestão financeira inteligente e gamificada",
+  "name": "Capitae Business",
+  "short_name": "Capitae Business",
+  "description": "Gestão financeira, PDV e estoque inteligente para microempreendedores, autônomos e pequenas empresas.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0B0B",

@@ -376,7 +376,12 @@ export default function Dashboard({ user }: DashboardProps) {
           />
         );
       case 'profile':
-        return <Profile user={user} />;
+        return (
+          <Profile 
+            user={user} 
+            onUpdateProfile={(updatedData) => setProfile((prev: any) => prev ? { ...prev, ...updatedData } : updatedData)}
+          />
+        );
       default:
         return null;
     }

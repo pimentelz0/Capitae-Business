@@ -47,7 +47,8 @@ interface GamificationProps {
   onNavigate?: (tab: 'home' | 'expenses' | 'goals' | 'learn' | 'capy' | 'profile' | 'gamification' | 'forecast' | 'reports') => void;
 }
 
-export default function Gamification({ user, profile, missions, expenses, goals, visits, isPro, onUpgrade, onMissionComplete, onNavigate }: GamificationProps) {
+export default function Gamification({ user, profile, missions, expenses, goals, visits, isPro: isProProp, onUpgrade, onMissionComplete, onNavigate }: GamificationProps) {
+  const isPro = true; // Set to true to unlock full gamification capabilities and remove upgrade checks
   const [buying, setBuying] = useState<string | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
   const [eligibilityMap, setEligibilityMap] = useState<Record<string, boolean>>({});

@@ -151,10 +151,6 @@ export default function Bills({ user, balance, onActionComplete, isPro = false, 
   };
 
   const handleOpenAddModal = () => {
-    if (!isPro && bills.length >= 2) {
-      if (onUpgrade) onUpgrade();
-      return;
-    }
     setEditingBillId(null);
     setNewBill({
       descricao: '',
@@ -181,10 +177,6 @@ export default function Bills({ user, balance, onActionComplete, isPro = false, 
 
   const handleSaveBill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBillId && !isPro && bills.length >= 2) {
-      if (onUpgrade) onUpgrade();
-      return;
-    }
     setActionLoading(true);
 
     try {
@@ -332,27 +324,6 @@ export default function Bills({ user, balance, onActionComplete, isPro = false, 
 
   return (
     <div className="space-y-8 pb-24">
-      {/* Free Plan Limits Info Banner */}
-      {!isPro && (
-        <div className="bg-primary/5 border border-primary/20 p-5 rounded-[28px] flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="p-2.5 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
-              <span className={`w-2.5 h-2.5 bg-primary rounded-full ${bills.length >= 2 ? '' : 'animate-ping'}`} />
-            </span>
-            <div>
-              <p className="text-xs font-bold text-foreground">Plano Gratuito - Limite de Contas</p>
-              <p className="text-[10px] text-muted">Você pode cadastrar no máximo 2 contas e recebíveis no total. ({bills.length}/2 usadas)</p>
-            </div>
-          </div>
-          <button
-            onClick={() => onUpgrade && onUpgrade()}
-            className="px-3.5 py-1.5 bg-primary text-background text-[10px] font-bold rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-primary/20 shrink-0"
-          >
-            {bills.length >= 2 ? 'Desbloquear Contas' : 'Seja Pro'}
-          </button>
-        </div>
-      )}
-
       {/* Tab Switcher */}
       <div className="flex p-1 bg-secondary rounded-2xl border border-foreground/5 max-w-sm mx-auto">
         <button 

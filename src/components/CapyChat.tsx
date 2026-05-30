@@ -32,7 +32,8 @@ interface CapyChatProps {
   onClose?: () => void;
 }
 
-export default function CapyChat({ user, expenses, goals, bills, profile, isPro, onActionComplete, onUpgrade, onClose }: CapyChatProps) {
+export default function CapyChat({ user, expenses, goals, bills, profile, isPro: isProProp, onActionComplete, onUpgrade, onClose }: CapyChatProps) {
+  const isPro = true; // Set to true to unlock full capability and remove any limitations or upgrade prompts
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

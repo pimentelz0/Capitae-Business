@@ -28,9 +28,10 @@ interface ProfileProps {
   isPro?: boolean;
   isTrialActive?: boolean;
   onUpgrade?: () => void;
+  onUpdateProfile?: (updatedData: Partial<ProfileData>) => void;
 }
 
-export default function Profile({ user, isPro, isTrialActive, onUpgrade }: ProfileProps) {
+export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdateProfile }: ProfileProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -69,9 +70,13 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
       if (user.id === 'guest_user') {
         const cached = localStorage.getItem('capitae_profile_guest_user');
         if (cached) {
-          setProfile(JSON.parse(cached));
+          const parsed = JSON.parse(cached);
+          setProfile(parsed);
+          if (onUpdateProfile) {
+            onUpdateProfile(parsed);
+          }
         } else {
-          setProfile({
+          const defaultGuest = {
             display_name: 'Usuário Local',
             avatar_url: '',
             bio: 'Minha barbearia, lanchonete ou confecção local sob controle.',
@@ -87,7 +92,11 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
             perc_essentials: 50,
             perc_leisure: 30,
             perc_investment: 20
-          });
+          };
+          setProfile(defaultGuest);
+          if (onUpdateProfile) {
+            onUpdateProfile(defaultGuest);
+          }
         }
         setLoading(false);
         return;
@@ -102,7 +111,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
-        setProfile({
+        const loadedProfile = {
           display_name: data.display_name || '',
           avatar_url: data.avatar_url || '',
           bio: data.bio || '',
@@ -118,7 +127,11 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
           perc_essentials: data.perc_essentials || 50,
           perc_leisure: data.perc_leisure || 30,
           perc_investment: data.perc_investment || 20
-        });
+        };
+        setProfile(loadedProfile);
+        if (onUpdateProfile) {
+          onUpdateProfile(loadedProfile);
+        }
       }
     } catch (error: any) {
       console.error('Erro ao buscar perfil:', error.message);
@@ -132,6 +145,9 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
     try {
       if (user.id === 'guest_user') {
         localStorage.setItem('capitae_profile_guest_user', JSON.stringify(profile));
+        if (onUpdateProfile) {
+          onUpdateProfile(profile);
+        }
         // Force trigger an update event or simply delay a bit to show a nice loader animation
         await new Promise(resolve => setTimeout(resolve, 800));
         setShowSaved(true);
@@ -148,6 +164,14 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
 
       if (error) throw error;
       
+      if (onUpdateProfile) {
+        onUpdateProfile({
+          display_name: profile.display_name,
+          avatar_url: profile.avatar_url,
+          bio: profile.bio
+        });
+      }
+
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
     } catch (error: any) {
@@ -157,6 +181,52 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
     }
   };
 
+  const compressAndGetBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 250;
+          const MAX_HEIGHT = 250;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85); // High capability, small size compressed JPEG
+            resolve(dataUrl);
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = (err) => {
+          reject(err);
+        };
+      };
+      reader.onerror = (err) => {
+        reject(err);
+      };
+    });
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
@@ -164,47 +234,32 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
 
       setUploading(true);
 
-      if (user.id === 'guest_user') {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          setProfile(prev => {
-            const updated = { ...prev, avatar_url: base64String };
-            localStorage.setItem('capitae_profile_guest_user', JSON.stringify(updated));
-            return updated;
-          });
-          setUploading(false);
-        };
-        reader.readAsDataURL(file);
-        return;
+      // Compress and convert to Base64 (100% reliable local mechanism avoiding storage policies)
+      const base64String = await compressAndGetBase64(file);
+
+      setProfile(prev => {
+        const updated = { ...prev, avatar_url: base64String };
+        if (user.id === 'guest_user') {
+          localStorage.setItem('capitae_profile_guest_user', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      // Synchronize in real-time across Dashboard
+      if (onUpdateProfile) {
+        onUpdateProfile({ avatar_url: base64String });
       }
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      // Upload image to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
-      
-      // Auto-save the new avatar URL to profile
-      await supabase.from('profiles').update({
-        avatar_url: publicUrl,
-        updated_at: new Date().toISOString()
-      }).eq('id', user.id);
+      if (user.id !== 'guest_user') {
+        const { error: dbError } = await supabase.from('profiles').update({
+          avatar_url: base64String,
+          updated_at: new Date().toISOString()
+        }).eq('id', user.id);
+        if (dbError) throw dbError;
+      }
 
     } catch (error: any) {
-      alert('Erro ao fazer upload: ' + error.message);
+      alert('Erro ao fazer upload da avatar: ' + error.message);
     } finally {
       setUploading(false);
     }
@@ -226,7 +281,6 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
       window.location.reload();
     } catch (err) {
       console.error('Profile: Error signing out:', err);
-      // Fallback reload in case of any issues
       window.location.reload();
     }
   };
@@ -235,6 +289,11 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
     e.preventDefault();
     setPasswordError('');
     setPasswordSuccess(false);
+
+    if (user.id === 'guest_user') {
+      setPasswordError('Como visitante local (Sem Login), você não possuí uma senha cadastrada no banco de dados. Cadastre sua conta para proteger seus dados!');
+      return;
+    }
 
     if (newPassword.trim().length < 6) {
       setPasswordError('A nova senha precisa ter pelo menos 6 caracteres.');
@@ -259,7 +318,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
       console.error('Password change error details:', err);
       const msg = err.message || '';
       if (msg.toLowerCase().includes('rate limit')) {
-        setPasswordError('Calma lá! Você atingiu o limite de tentativas de autenticação. Aguarde um momento antes de tentar novamente.');
+        setPasswordError('Você atingiu o limite de tentativas de autenticação. Aguarde um momento antes de tentar novamente.');
       } else {
         setPasswordError(err.message || 'Ocorreu um erro ao atualizar sua senha.');
       }
@@ -315,34 +374,15 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade }: Profi
         <div className="text-center">
           <div className="flex items-center justify-center gap-2">
             <h3 className="text-xl font-bold">{profile.display_name || 'Seu Nome'}</h3>
-            {isPro ? (
-              <span className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest rounded-full border border-primary/20">
-                Pro
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 bg-foreground/10 text-muted text-[10px] font-bold uppercase tracking-widest rounded-full border border-foreground/10">
-                Teste Grátis
-              </span>
-            )}
           </div>
-          <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="flex items-center justify-center gap-2 mt-2">
             <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20 uppercase tracking-widest">
-              {profile.level || 'Sobrevivente'}
+              {profile.level || 'Estrategista'}
             </span>
             <span className="text-xs text-muted flex items-center gap-1">
               <Mail className="w-3 h-3" /> {userEmail}
             </span>
           </div>
-          
-          {!isPro && (
-            <button 
-              onClick={onUpgrade}
-              className="mt-4 px-6 py-2 bg-primary text-background rounded-xl font-bold text-xs shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mx-auto hover:scale-[1.02] transition-all"
-            >
-              <Zap className="w-3 h-3 fill-background" />
-              Seja Pro por R$ 14,90/mês
-            </button>
-          )}
         </div>
       </div>
 

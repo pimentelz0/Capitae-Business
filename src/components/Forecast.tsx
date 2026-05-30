@@ -46,7 +46,8 @@ const playClickSound = () => {
   }
 };
 
-export default function Forecast({ user, expenses, goals, totalNetWorth, availableBalance = 0, onNavigate, onUpgrade, isPro = false }: ForecastProps) {
+export default function Forecast({ user, expenses, goals, totalNetWorth, availableBalance = 0, onNavigate, onUpgrade, isPro: isProProp = false }: ForecastProps) {
+  const isPro = true; // Always true to unlock all forecast features and remove upgrade notice gates
   const [profile, setProfile] = useState({
     monthly_income: 0,
     fixed_costs: 0,

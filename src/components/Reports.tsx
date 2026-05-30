@@ -62,7 +62,8 @@ interface ReportsProps {
 
 type Period = 'day' | 'week' | 'month' | 'year' | 'custom';
 
-export default function Reports({ user, expenses, isPro = false, onUpgrade }: ReportsProps) {
+export default function Reports({ user, expenses, isPro: isProProp = false, onUpgrade }: ReportsProps) {
+  const isPro = true; // Always true to unlock all beautiful business charts and export modules
   const [period, setPeriod] = useState<Period>('month');
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA'));
   const [endDate, setEndDate] = useState(new Date().toLocaleDateString('en-CA'));

@@ -76,8 +76,15 @@ interface DashboardProps {
 export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile'>('pdv');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem(`capitae_business_theme_${user.id}`) as 'dark' | 'light') || 'light';
+  });
   const [isPrivateMode, setIsPrivateMode] = useState(false);
+
+  // Persist theme to localStorage
+  useEffect(() => {
+    localStorage.setItem(`capitae_business_theme_${user.id}`, theme);
+  }, [theme, user.id]);
 
   // Core Data sets
   const [produtos, setProdutos] = useState<Produto[]>([]);

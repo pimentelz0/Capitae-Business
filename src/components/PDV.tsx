@@ -27,6 +27,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [revendaQtd, setRevendaQtd] = useState<number>(1);
   const [revendaMeio, setRevendaMeio] = useState<string>('Pix');
   const [registrarCusto, setRegistrarCusto] = useState<boolean>(true);
+  const [registrarCustoEstoque, setRegistrarCustoEstoque] = useState<boolean>(true);
 
   // Categories extraction
   const categories = ['Todos', ...Array.from(new Set(produtos.map(p => p.categoria)))];
@@ -87,6 +88,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const subtotal = cart.reduce((acc, item) => acc + (item.produto.preco_venda * item.qtd), 0);
   const discountAmount = (subtotal * discount) / 100;
   const total = Math.max(0, subtotal - discountAmount);
+  const totalCustoEstoque = cart.reduce((acc, item) => acc + ((item.produto.preco_custo || 0) * item.qtd), 0);
 
   // Finalize sale
   const handleFinalizeSale = (e: React.FormEvent) => {
@@ -102,8 +104,10 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       onUpdateProdutoQuantidade(item.produto.id, item.produto.quantidade - item.qtd);
     });
 
-    // Create entry transaction
-    onAddTransacao({
+    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
+
+    // Create entry transaction (sale value received)
+    transacoesParaAdicionar.push({
       tipo: 'entrada',
       descricao: descriptionText,
       valor: total,
@@ -113,6 +117,27 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       status: 'pago',
       meio_pagamento: meioPagamento
     });
+
+    // Create automatic cost transaction if enabled and total cost is positive
+    if (registrarCustoEstoque && totalCustoEstoque > 0) {
+      const itemsCostDescription = cart
+        .filter(item => (item.produto.preco_custo || 0) > 0)
+        .map(item => `${item.qtd}x ${item.produto.nome} (Custo: R$ ${item.produto.preco_custo.toFixed(2)} un)`)
+        .join(', ');
+
+      transacoesParaAdicionar.push({
+        tipo: 'saida',
+        descricao: `[Custo de Vendas] ${itemsCostDescription}`,
+        valor: totalCustoEstoque,
+        categoria: 'Aquisição de Mercadorias',
+        data: new Date().toISOString().split('T')[0],
+        tipo_registro: 'imediato',
+        status: 'pago',
+        meio_pagamento: meioPagamento
+      });
+    }
+
+    onAddTransacao(transacoesParaAdicionar);
 
     setRecentTotal(total);
     setCart([]);
@@ -637,6 +662,24 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                     ))}
                   </div>
                 </div>
+
+                {/* Auto Cost Registration for registered assets */}
+                {totalCustoEstoque > 0 && (
+                  <label className="flex items-start gap-3 cursor-pointer p-3 bg-background/40 hover:bg-background/60 rounded-2xl border border-foreground/5 text-xs text-muted hover:text-white transition-all select-none">
+                    <input
+                      type="checkbox"
+                      checked={registrarCustoEstoque}
+                      onChange={(e) => setRegistrarCustoEstoque(e.target.checked)}
+                      className="rounded border-foreground/10 text-primary focus:ring-primary bg-background w-4 h-4 mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <span className="font-bold block text-white text-[11px] leading-tight">Registrar custo automático (CMV)</span>
+                      <p className="text-[10px] leading-tight text-muted mt-0.5">
+                        Gera uma saída automática de R$ {isPrivateMode ? '•••' : totalCustoEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no caixa para abater do lucro bruto.
+                      </p>
+                    </div>
+                  </label>
+                )}
 
                 {/* Unified Total */}
                 <div className="pt-4 border-t border-foreground/5 flex justify-between items-end">

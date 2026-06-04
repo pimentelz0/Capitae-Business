@@ -5,26 +5,22 @@ import { motion } from 'motion/react';
 export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean }) {
   // Calculator inputs
   const [custoAquisicao, setCustoAquisicao] = useState<number>(30); // R$ 30,00 cost
-  const [despesasOperacionaisPct, setDespesasOperacionaisPct] = useState<number>(15); // 15% taxes, fees
-  const [margemLucroDesejadaPct, setMargemLucroDesejadaPct] = useState<number>(30); // 30% desired profit
+  const [despesasOperacionaisValor, setDespesasOperacionaisValor] = useState<number>(5); // R$ 5,00 variable expenses
+  const [lucroLiquidoDesejado, setLucroLiquidoDesejado] = useState<number>(15); // R$ 15,00 desired profit
 
   // Break-even inputs
   const [despesasFixasMensais, setDespesasFixasMensais] = useState<number>(1500); // R$ 1.500,00 fixed costs
 
-  // Pricing math: Margin Markup formula
-  // Selling Price = Cost / (1 - (Overhead% + Profit%) / 100)
-  const somaPercentuais = despesasOperacionaisPct + margemLucroDesejadaPct;
-  const divisor = 1 - (somaPercentuais / 100);
-
-  // If divisor is <= 0 (percent sums >= 100), handle safely
-  const precoSugerido = divisor > 0.05 
-    ? custoAquisicao / divisor 
-    : custoAquisicao * (1 + (somaPercentuais/100) * 1.5); 
+  // Pricing math: Direct cash pricing
+  // Selling Price = Cost + Variable Expenses + Desired Profit
+  const precoSugerido = custoAquisicao + despesasOperacionaisValor + lucroLiquidoDesejado; 
 
   const markupReal = custoAquisicao > 0 ? precoSugerido / custoAquisicao : 0;
   
-  const despesasOperacionaisValor = precoSugerido * (despesasOperacionaisPct / 100);
-  const lucroLiquidoUnitario = precoSugerido - custoAquisicao - despesasOperacionaisValor;
+  const despesasOperacionaisPct = precoSugerido > 0 ? (despesasOperacionaisValor / precoSugerido) * 100 : 0;
+  const margemLucroDesejadaPct = precoSugerido > 0 ? (lucroLiquidoDesejado / precoSugerido) * 100 : 0;
+  
+  const lucroLiquidoUnitario = lucroLiquidoDesejado;
   const margemContribuicaoPct = precoSugerido > 0 ? (lucroLiquidoUnitario / precoSugerido) * 100 : 0;
 
   // Break-even math (in units)
@@ -92,58 +88,58 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
               />
             </div>
 
-            {/* Slider 2: Operational Overhead Pct */}
+            {/* Slider 2: Operational Overhead in R$ */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm font-bold">
-                <label className="text-white">Despesas Variáveis sobre Venda (%)</label>
-                <div className="flex items-center gap-1 bg-background border border-foreground/5 py-1 px-3.5 rounded-xl">
+                <label className="text-white">Despesas Variáveis por Venda (R$)</label>
+                <div className="flex items-center gap-1.5 bg-background border border-foreground/5 py-1 px-3.5 rounded-xl">
+                  <span className="text-xs text-muted">R$</span>
                   <input
                     type="number"
+                    step="0.01"
                     min="0"
-                    max="90"
-                    value={despesasOperacionaisPct || ''}
-                    onChange={(e) => setDespesasOperacionaisPct(Math.min(90, Math.max(0, parseInt(e.target.value) || 0)))}
-                    className="w-10 bg-transparent text-yellow-500 font-extrabold outline-none text-right"
+                    value={despesasOperacionaisValor || ''}
+                    onChange={(e) => setDespesasOperacionaisValor(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-16 bg-transparent text-yellow-500 font-extrabold outline-none text-right"
                   />
-                  <span className="text-xs text-muted">%</span>
                 </div>
               </div>
-              <p className="text-xs text-muted">Soma de Impostos, comissões de vendedores, taxa de maquininha de cartão e embalagem.</p>
+              <p className="text-xs text-muted">Soma de Impostos, comissões de vendedores, taxa de maquininha de cartão e embalagem (valor fixado em dinheiro).</p>
               <input
                 type="range"
                 min="0"
-                max="60"
+                max="200"
                 step="1"
-                value={despesasOperacionaisPct}
-                onChange={(e) => setDespesasOperacionaisPct(parseInt(e.target.value))}
+                value={despesasOperacionaisValor}
+                onChange={(e) => setDespesasOperacionaisValor(parseFloat(e.target.value))}
                 className="w-full accent-yellow-500 h-1 bg-background rounded-lg appearance-none cursor-pointer"
               />
             </div>
 
-            {/* Slider 3: Desired gain */}
+            {/* Slider 3: Desired gain in R$ */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm font-bold">
-                <label className="text-white font-sans">Margem de Lucro Desejada (%)</label>
-                <div className="flex items-center gap-1 bg-background border border-foreground/5 py-1 px-3.5 rounded-xl">
+                <label className="text-white font-sans">Margem de Lucro Desejada (R$)</label>
+                <div className="flex items-center gap-1.5 bg-background border border-foreground/5 py-1 px-3.5 rounded-xl">
+                  <span className="text-xs text-muted">R$</span>
                   <input
                     type="number"
-                    min="1"
-                    max="90"
-                    value={margemLucroDesejadaPct || ''}
-                    onChange={(e) => setMargemLucroDesejadaPct(Math.min(90, Math.max(1, parseInt(e.target.value) || 0)))}
-                    className="w-10 bg-transparent text-primary font-extrabold outline-none text-right"
+                    step="0.01"
+                    min="0"
+                    value={lucroLiquidoDesejado || ''}
+                    onChange={(e) => setLucroLiquidoDesejado(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-16 bg-transparent text-[#00C853] font-extrabold outline-none text-right"
                   />
-                  <span className="text-xs text-muted">%</span>
                 </div>
               </div>
-              <p className="text-xs text-muted">O retorno líquido que você quer que sobre para o caixa da empresa para reinvestimentos.</p>
+              <p className="text-xs text-muted">O retorno líquido (lucro) em dinheiro que você quer que sobre para você por unidade vendida.</p>
               <input
                 type="range"
-                min="5"
-                max="80"
+                min="0"
+                max="500"
                 step="1"
-                value={margemLucroDesejadaPct}
-                onChange={(e) => setMargemLucroDesejadaPct(parseInt(e.target.value))}
+                value={lucroLiquidoDesejado}
+                onChange={(e) => setLucroLiquidoDesejado(parseFloat(e.target.value))}
                 className="w-full accent-primary h-1 bg-background rounded-lg appearance-none cursor-pointer"
               />
             </div>
@@ -152,7 +148,7 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
           {/* Theoretical info alert */}
           <div className="bg-background/40 p-4 border border-foreground/5 rounded-2xl flex items-start gap-2.5 text-xs text-muted">
             <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p><strong>Atenção:</strong> Cobrar 50% de lucro adicionando R$ 15 sobre um item de R$ 30 produz R$ 45, o que é um engano operacional! A despesa variável drena o lucro sobre o valor global da venda de R$ 45, diminuindo sua margem ideal. Esta fórmula de markup comercial assegura os faturamentos reais.</p>
+            <p><strong>Facilidade de Precificação:</strong> Ao definir todos os valores diretamente em dinheiro (R$), você sabe exatamente quanto cada unidade custa, quanto consome de despesas (como taxas, impostos e embalagens) e quanto sobra de lucro no seu bolso.</p>
           </div>
         </div>
 
@@ -182,11 +178,11 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
                 <span className="text-white">R$ {custoAquisicao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between">
-                <span>Taxas & Despesas Variáveis ({despesasOperacionaisPct}%)</span>
+                <span>Taxas & Despesas Variáveis ({despesasOperacionaisPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)</span>
                 <span className="text-white">R$ {despesasOperacionaisValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between">
-                <span>Margem Líquida que sobra (R$)</span>
+                <span>Margem Líquida que sobra ({margemLucroDesejadaPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)</span>
                 <span className="text-primary font-bold">R$ {lucroLiquidoUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>

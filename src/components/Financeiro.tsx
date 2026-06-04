@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Transacao } from '../types';
-import { TrendingUp, TrendingDown, Plus, Trash2, Calendar, FileText, CheckCircle, Clock, Filter, DollarSign, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Plus, Trash2, Edit2, Calendar, FileText, CheckCircle, Clock, Filter, DollarSign, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface FinanceiroProps {
@@ -8,13 +8,18 @@ interface FinanceiroProps {
   onAddTransacao: (transacao: Omit<Transacao, 'id'>) => void;
   onUpdateTransacaoStatus: (id: string, novoStatus: 'pago' | 'pendente') => void;
   onDeleteTransacao: (id: string) => void;
+  onEditTransacao?: (transacao: Transacao) => void;
   isPrivateMode: boolean;
 }
 
-export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransacaoStatus, onDeleteTransacao, isPrivateMode }: FinanceiroProps) {
+export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransacaoStatus, onDeleteTransacao, onEditTransacao, isPrivateMode }: FinanceiroProps) {
   const [subTab, setSubTab] = useState<'geral' | 'pagar' | 'receber'>('geral');
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7dias' | 'mes' | 'todos'>('mes');
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Editing states
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingMeioPagamento, setEditingMeioPagamento] = useState<string | undefined>(undefined);
 
   // Form states
   const [tipo, setTipo] = useState<'entrada' | 'saida'>('entrada');
@@ -42,23 +47,63 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
     const status = isPending ? 'pendente' : 'pago';
     const finalVencimento = isPending ? vencimento : undefined;
 
-    onAddTransacao({
-      tipo,
-      valor,
-      descricao,
-      categoria,
-      data,
-      tipo_registro: tipoRegistro,
-      data_vencimento: finalVencimento,
-      status
-    });
+    if (editingId) {
+      if (onEditTransacao) {
+        onEditTransacao({
+          id: editingId,
+          tipo,
+          valor,
+          descricao,
+          categoria,
+          data,
+          tipo_registro: tipoRegistro,
+          data_vencimento: finalVencimento,
+          status,
+          meio_pagamento: editingMeioPagamento
+        });
+      }
+    } else {
+      onAddTransacao({
+        tipo,
+        valor,
+        descricao,
+        categoria,
+        data,
+        tipo_registro: tipoRegistro,
+        data_vencimento: finalVencimento,
+        status
+      });
+    }
 
-    // Reset Form
+    handleCloseForm();
+  };
+
+  const handleStartEdit = (t: Transacao) => {
+    setEditingId(t.id);
+    setTipo(t.tipo);
+    setValor(t.valor);
+    setDescricao(t.descricao);
+    setCategoria(t.categoria);
+    setData(t.data);
+    setTipo_registro_adapted(t.tipo_registro);
+    setVencimento(t.data_vencimento || t.data);
+    setEditingMeioPagamento(t.meio_pagamento);
+    setShowAddForm(true);
+  };
+
+  const handleCloseForm = () => {
     setValor(0);
     setDescricao('');
     setCategoria('');
     setTipoRegistro('imediato');
+    setEditingId(null);
+    setEditingMeioPagamento(undefined);
     setShowAddForm(false);
+  };
+
+  // Helper helper to bypass typescript setter type mismatch warning if any
+  const setTipo_registro_adapted = (val: 'imediato' | 'pagar' | 'receber') => {
+    setTipoRegistro(val);
   };
 
   // Safe Date parsing & formatting
@@ -207,10 +252,10 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
           <div className="relative w-full max-w-3xl bg-secondary border border-foreground/5 rounded-[32px] shadow-2xl overflow-hidden animate-fadeIn my-auto">
             <div className="p-6 border-b border-foreground/5 flex justify-between items-center bg-background/60 relative z-10">
-              <h3 className="font-bold text-base text-white">Lançar Nova Transação</h3>
+              <h3 className="font-bold text-base text-white">{editingId ? 'Editar Lançamento' : 'Lançar Nova Transação'}</h3>
               <button 
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={handleCloseForm}
                 className="text-xs text-muted hover:text-white bg-foreground/5 px-3 py-1.5 rounded-xl transition-all hover:bg-foreground/10"
               >
                 Cancelar
@@ -355,7 +400,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                     type="submit"
                     className="w-full py-4 bg-primary text-background font-bold rounded-2xl transition-all shadow-lg hover:bg-opacity-95 text-xs tracking-wider uppercase"
                   >
-                    Salvar Registro
+                    {editingId ? 'Salvar Edições' : 'Salvar Registro'}
                   </button>
                 </div>
               </div>
@@ -471,12 +516,22 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                             {t.tipo === 'entrada' ? '+' : '-'} R$ {isPrivateMode ? '•••' : t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="py-3.5 px-2 text-center">
-                            <button
-                              onClick={() => onDeleteTransacao(t.id)}
-                              className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleStartEdit(t)}
+                                className="p-1.5 text-muted hover:text-primary rounded-lg hover:bg-foreground/5 transition-all"
+                                title="Editar Lançamento"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => onDeleteTransacao(t.id)}
+                                className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-all"
+                                title="Excluir Lançamento"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -528,8 +583,16 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                             Quitar Pago
                           </button>
                           <button
+                            onClick={() => handleStartEdit(t)}
+                            className="p-2 bg-foreground/5 hover:bg-primary/10 text-muted hover:text-primary rounded-xl transition-all"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => onDeleteTransacao(t.id)}
                             className="p-2 bg-foreground/5 hover:bg-red-500/10 text-muted hover:text-red-500 rounded-xl transition-all"
+                            title="Excluir"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -583,8 +646,16 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                             Quitar Recebido
                           </button>
                           <button
+                            onClick={() => handleStartEdit(t)}
+                            className="p-2 bg-foreground/5 hover:bg-primary/10 text-muted hover:text-primary rounded-xl transition-all"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => onDeleteTransacao(t.id)}
                             className="p-2 bg-foreground/5 hover:bg-red-500/10 text-muted hover:text-red-500 rounded-xl transition-all"
+                            title="Excluir"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

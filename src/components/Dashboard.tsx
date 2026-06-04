@@ -105,26 +105,102 @@ export default function Dashboard({ user }: DashboardProps) {
         const transKey = `capitae_business_transactions_${user.id}`;
         const onboardingKey = `capitae_seen_onboarding_${user.id}`;
 
-        // Products
+        let prodsLoaded = false;
+        let transLoaded = false;
+
+        // Products (Fast Local-First Load)
         const cachedProds = localStorage.getItem(prodKey);
         if (cachedProds) {
           setProdutos(JSON.parse(cachedProds));
-        } else {
-          // For real logged in users, default to empty list, only seed for guest user
-          const initialProds = user.id === 'guest_user' ? INITIAL_PRODUCTS : [];
-          setProdutos(initialProds);
-          localStorage.setItem(prodKey, JSON.stringify(initialProds));
+          prodsLoaded = true;
         }
 
-        // Transactions
+        // Transactions (Fast Local-First Load)
         const cachedTrans = localStorage.getItem(transKey);
         if (cachedTrans) {
           setTransacoes(JSON.parse(cachedTrans));
-        } else {
-          // For real logged in users, default to empty list, only seed for guest user
-          const initialTrans = user.id === 'guest_user' ? generateInitialTransactions() : [];
-          setTransacoes(initialTrans);
-          localStorage.setItem(transKey, JSON.stringify(initialTrans));
+          transLoaded = true;
+        }
+
+        // Real-time Database Hydration Cloud Sync (Only for real registered accounts)
+        if (user.id !== 'guest_user') {
+          console.log('Dashboard: Fetching persistent cloud backup...');
+          try {
+            const { data: dbMemories, error: dbError } = await supabase
+              .from('user_memories')
+              .select('key, value')
+              .eq('user_id', user.id)
+              .in('key', ['business_products', 'business_transactions']);
+
+            if (!dbError && dbMemories && dbMemories.length > 0) {
+              const prodMem = dbMemories.find(m => m.key === 'business_products');
+              if (prodMem && prodMem.value) {
+                const parsedProds = JSON.parse(prodMem.value);
+                setProdutos(parsedProds);
+                localStorage.setItem(prodKey, prodMem.value);
+                prodsLoaded = true;
+                console.log('Dashboard: Successfully synced products backup from cloud.');
+              }
+
+              const transMem = dbMemories.find(m => m.key === 'business_transactions');
+              if (transMem && transMem.value) {
+                const parsedTrans = JSON.parse(transMem.value);
+                setTransacoes(parsedTrans);
+                localStorage.setItem(transKey, transMem.value);
+                transLoaded = true;
+                console.log('Dashboard: Successfully synced transactions backup from cloud.');
+              }
+            }
+          } catch (cloudErr) {
+            console.error('Dashboard: Error restoring cache from database:', cloudErr);
+          }
+        }
+
+        // Migration or default seeding fallbacks (if data wasn't found in cache or DB)
+        if (!prodsLoaded) {
+          // If no products exist for this user, check if we have unsaved guest_user products to migrate
+          const guestProdsStr = localStorage.getItem('capitae_business_products_guest_user');
+          if (guestProdsStr && user.id !== 'guest_user') {
+            const guestProds = JSON.parse(guestProdsStr);
+            setProdutos(guestProds);
+            localStorage.setItem(prodKey, JSON.stringify(guestProds));
+            
+            // Sync newly migrated products to the database
+            supabase.from('user_memories').upsert([{
+              user_id: user.id,
+              key: 'business_products',
+              value: JSON.stringify(guestProds),
+              updated_at: new Date().toISOString()
+            }], { onConflict: 'user_id,key' }).then(() => {});
+          } else {
+            // For real logged in users, default to empty list, only seed for guest user
+            const initialProds = user.id === 'guest_user' ? INITIAL_PRODUCTS : [];
+            setProdutos(initialProds);
+            localStorage.setItem(prodKey, JSON.stringify(initialProds));
+          }
+        }
+
+        if (!transLoaded) {
+          // If no transactions exist for this user, check if we have unsaved guest_user transactions to migrate
+          const guestTransStr = localStorage.getItem('capitae_business_transactions_guest_user');
+          if (guestTransStr && user.id !== 'guest_user') {
+            const guestTrans = JSON.parse(guestTransStr);
+            setTransacoes(guestTrans);
+            localStorage.setItem(transKey, JSON.stringify(guestTrans));
+
+            // Sync newly migrated transactions to the database
+            supabase.from('user_memories').upsert([{
+              user_id: user.id,
+              key: 'business_transactions',
+              value: JSON.stringify(guestTrans),
+              updated_at: new Date().toISOString()
+            }], { onConflict: 'user_id,key' }).then(() => {});
+          } else {
+            // For real logged in users, default to empty list, only seed for guest user
+            const initialTrans = user.id === 'guest_user' ? generateInitialTransactions() : [];
+            setTransacoes(initialTrans);
+            localStorage.setItem(transKey, JSON.stringify(initialTrans));
+          }
         }
 
         // Setup Onboarding & terms display rules
@@ -236,11 +312,33 @@ export default function Dashboard({ user }: DashboardProps) {
   const saveProductsToCache = (updatedList: Produto[]) => {
     setProdutos(updatedList);
     localStorage.setItem(`capitae_business_products_${user.id}`, JSON.stringify(updatedList));
+
+    if (user.id !== 'guest_user') {
+      supabase.from('user_memories').upsert([{
+        user_id: user.id,
+        key: 'business_products',
+        value: JSON.stringify(updatedList),
+        updated_at: new Date().toISOString()
+      }], { onConflict: 'user_id,key' }).then(({ error }) => {
+        if (error) console.error('Dashboard: Error backing up products to database:', error);
+      });
+    }
   };
 
   const saveTransactionsToCache = (updatedList: Transacao[]) => {
     setTransacoes(updatedList);
     localStorage.setItem(`capitae_business_transactions_${user.id}`, JSON.stringify(updatedList));
+
+    if (user.id !== 'guest_user') {
+      supabase.from('user_memories').upsert([{
+        user_id: user.id,
+        key: 'business_transactions',
+        value: JSON.stringify(updatedList),
+        updated_at: new Date().toISOString()
+      }], { onConflict: 'user_id,key' }).then(({ error }) => {
+        if (error) console.error('Dashboard: Error backing up transactions to database:', error);
+      });
+    }
   };
 
   // State operations handlers
@@ -266,6 +364,11 @@ export default function Dashboard({ user }: DashboardProps) {
       const updated = transacoes.filter(t => t.id !== id);
       saveTransactionsToCache(updated);
     }
+  };
+
+  const handleEditTransacao = (updatedT: Transacao) => {
+    const updated = transacoes.map(t => t.id === updatedT.id ? updatedT : t);
+    saveTransactionsToCache(updated);
   };
 
   const handleAddProduto = (newP: Omit<Produto, 'id'>) => {
@@ -357,6 +460,7 @@ export default function Dashboard({ user }: DashboardProps) {
             onAddTransacao={handleAddTransacao}
             onUpdateTransacaoStatus={handleUpdateTransacaoStatus}
             onDeleteTransacao={handleDeleteTransacao}
+            onEditTransacao={handleEditTransacao}
             isPrivateMode={isPrivateMode}
           />
         );

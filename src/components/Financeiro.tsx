@@ -24,6 +24,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
   // Form states
   const [tipo, setTipo] = useState<'entrada' | 'saida'>('entrada');
   const [valor, setValor] = useState<number>(0);
+  const [custoVenda, setCustoVenda] = useState<number>(0);
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
   const [data, setData] = useState(new Date().toISOString().split('T')[0]);
@@ -59,7 +60,8 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
           tipo_registro: tipoRegistro,
           data_vencimento: finalVencimento,
           status,
-          meio_pagamento: editingMeioPagamento
+          meio_pagamento: editingMeioPagamento,
+          custo_venda: tipo === 'entrada' ? custoVenda : undefined
         });
       }
     } else {
@@ -71,7 +73,8 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
         data,
         tipo_registro: tipoRegistro,
         data_vencimento: finalVencimento,
-        status
+        status,
+        custo_venda: tipo === 'entrada' ? custoVenda : undefined
       });
     }
 
@@ -82,6 +85,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
     setEditingId(t.id);
     setTipo(t.tipo);
     setValor(t.valor);
+    setCustoVenda(t.custo_venda || 0);
     setDescricao(t.descricao);
     setCategoria(t.categoria);
     setData(t.data);
@@ -93,6 +97,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
 
   const handleCloseForm = () => {
     setValor(0);
+    setCustoVenda(0);
     setDescricao('');
     setCategoria('');
     setTipoRegistro('imediato');
@@ -312,6 +317,27 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                   />
                 </div>
 
+                {/* Manual Cost Field for Sales/Entradas */}
+                {tipo === 'entrada' && (
+                  <div className="space-y-2 bg-foreground/5 p-4 rounded-2xl border border-foreground/5">
+                    <label className="text-xs text-muted font-bold uppercase flex items-center justify-between">
+                      <span>Custo de Aquisição (R$)</span>
+                      <span className="text-[10px] text-primary lowercase">opcional</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={custoVenda === 0 ? '' : custoVenda}
+                      onChange={(e) => setCustoVenda(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-background border border-foreground/10 p-3 rounded-xl text-white outline-none focus:border-primary transition-all text-sm"
+                    />
+                    <p className="text-[10px] text-muted tracking-tight leading-normal mt-1">
+                      Custo estimado investido para obter este produto. Ele será deduzido do valor total para calcular o lucro líquido em relatórios e listagens.
+                    </p>
+                  </div>
+                )}
+
                 {/* Description */}
                 <div className="space-y-2">
                   <label className="text-xs text-muted font-bold uppercase">Descrição / Beneficiário*</label>
@@ -501,6 +527,8 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                         <th className="py-3 px-2">Categoria</th>
                         <th className="py-3 px-2">Meio</th>
                         <th className="py-3 px-2 text-right">Valor</th>
+                        <th className="py-3 px-2 text-right">Custo</th>
+                        <th className="py-3 px-2 text-right">Lucro</th>
                         <th className="py-3 px-2 text-center">Ações</th>
                       </tr>
                     </thead>
@@ -517,6 +545,12 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                           <td className="py-3.5 px-2 text-xs text-muted">{t.meio_pagamento || '-'}</td>
                           <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {t.tipo === 'entrada' ? '+' : '-'} R$ {isPrivateMode ? '•••' : t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-2 text-right text-muted">
+                            {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.custo_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                          </td>
+                          <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-red-400/80'}`}>
+                            {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.valor - (t.custo_venda || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ -${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
                           </td>
                           <td className="py-3.5 px-2 text-center">
                             <div className="flex items-center justify-center gap-1.5">

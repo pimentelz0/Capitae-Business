@@ -96,6 +96,8 @@ export default function Dashboard({ user }: DashboardProps) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showTermsConsent, setShowTermsConsent] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [deletingTransId, setDeletingTransId] = useState<string | null>(null);
+  const [returnToStock, setReturnToStock] = useState<boolean>(true);
 
   // Load from local Cache scoped per user
   useEffect(() => {
@@ -360,10 +362,32 @@ export default function Dashboard({ user }: DashboardProps) {
   };
 
   const handleDeleteTransacao = (id: string) => {
-    if (confirm('Tem certeza de que deseja excluir este lançamento financeiro?')) {
-      const updated = transacoes.filter(t => t.id !== id);
-      saveTransactionsToCache(updated);
+    setDeletingTransId(id);
+    setReturnToStock(true);
+  };
+
+  const executeDeleteTransacao = () => {
+    if (!deletingTransId) return;
+    const trans = transacoes.find(t => t.id === deletingTransId);
+
+    // If restocking opted in and product exists in active stock collection
+    if (trans && returnToStock && trans.tipo === 'entrada' && trans.itens_venda && trans.itens_venda.length > 0) {
+      const updatedProducts = produtos.map(p => {
+        const itemVendido = trans.itens_venda?.find(item => item.produto_id === p.id);
+        if (itemVendido) {
+          return {
+            ...p,
+            quantidade: p.quantidade + itemVendido.qtd
+          };
+        }
+        return p;
+      });
+      saveProductsToCache(updatedProducts);
     }
+
+    const updated = transacoes.filter(t => t.id !== deletingTransId);
+    saveTransactionsToCache(updated);
+    setDeletingTransId(null);
   };
 
   const handleEditTransacao = (updatedT: Transacao) => {
@@ -721,6 +745,94 @@ export default function Dashboard({ user }: DashboardProps) {
             </motion.div>
           </div>
         )}
+
+        {deletingTransId && (() => {
+          const transToDel = transacoes.find(t => t.id === deletingTransId);
+          // Only show stock return option for entries with items_venda
+          const hasStockReturnOption = !!(transToDel && transToDel.tipo === 'entrada' && transToDel.itens_venda && transToDel.itens_venda.length > 0);
+
+          return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setDeletingTransId(null)}
+                className="absolute inset-0 bg-background/85 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-md bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl text-center space-y-6"
+              >
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto text-red-500 animate-pulse">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-white">Confirmar Exclusão</h3>
+                  <p className="text-sm text-muted">
+                    Tem certeza de que deseja excluir este lançamento financeiro de forma permanente?
+                  </p>
+                </div>
+
+                {transToDel && (
+                  <div className="text-left bg-background/40 p-4 rounded-2xl border border-foreground/5 space-y-1">
+                    <span className="text-[10px] text-muted uppercase font-bold tracking-widest block">Lançamento</span>
+                    <p className="text-sm text-white font-bold truncate">{transToDel.descricao}</p>
+                    <p className="text-xs text-[#00C853] font-bold">
+                      Valor: R$ {transToDel.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+
+                {hasStockReturnOption ? (
+                  <div className="bg-background/40 hover:bg-background/60 p-4 rounded-2xl border border-foreground/5 flex items-start gap-3 text-left transition-colors">
+                    <div className="flex items-center h-5 mt-0.5">
+                      <input
+                        type="checkbox"
+                        id="returnToStockCheckbox"
+                        checked={returnToStock}
+                        onChange={(e) => setReturnToStock(e.target.checked)}
+                        className="w-5 h-5 accent-primary cursor-pointer rounded border-foreground/20 bg-background"
+                      />
+                    </div>
+                    <label htmlFor="returnToStockCheckbox" className="text-xs text-white leading-snug cursor-pointer select-none">
+                      <span className="font-extrabold block text-primary">Devolver produtos ao estoque?</span>
+                      Os itens desta venda voltarão para a prateleira ativa de estoque.
+                    </label>
+                  </div>
+                ) : (
+                  transToDel && transToDel.categoria === 'Vendas (PDV)' && (
+                    <div className="bg-foreground/5 p-3 rounded-2xl border border-foreground/5 text-center">
+                      <p className="text-[11px] text-muted italic">
+                        Venda rápida realizada diretamente sem estoque registrado. Nenhum item retornará ao estoque.
+                      </p>
+                    </div>
+                  )
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingTransId(null)}
+                    className="flex-1 py-3.5 bg-foreground/5 hover:bg-foreground/10 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={executeDeleteTransacao}
+                    className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all active:scale-95 text-sm"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

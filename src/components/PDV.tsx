@@ -104,10 +104,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       onUpdateProdutoQuantidade(item.produto.id, item.produto.quantidade - item.qtd);
     });
 
-    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
-
-    // Create entry transaction (sale value received)
-    transacoesParaAdicionar.push({
+    // Create single unified entry transaction with integrated product cost and items metadata
+    const transacaoUnica: Omit<Transacao, 'id'> = {
       tipo: 'entrada',
       descricao: descriptionText,
       valor: total,
@@ -115,29 +113,16 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       data: new Date().toISOString().split('T')[0],
       tipo_registro: 'imediato',
       status: 'pago',
-      meio_pagamento: meioPagamento
-    });
+      meio_pagamento: meioPagamento,
+      custo_venda: registrarCustoEstoque ? totalCustoEstoque : 0,
+      itens_venda: cart.map(item => ({
+        produto_id: item.produto.id,
+        qtd: item.qtd,
+        nome: item.produto.nome
+      }))
+    };
 
-    // Create automatic cost transaction if enabled and total cost is positive
-    if (registrarCustoEstoque && totalCustoEstoque > 0) {
-      const itemsCostDescription = cart
-        .filter(item => (item.produto.preco_custo || 0) > 0)
-        .map(item => `${item.qtd}x ${item.produto.nome} (Custo: R$ ${item.produto.preco_custo.toFixed(2)} un)`)
-        .join(', ');
-
-      transacoesParaAdicionar.push({
-        tipo: 'saida',
-        descricao: `[Custo de Vendas] ${itemsCostDescription}`,
-        valor: totalCustoEstoque,
-        categoria: 'Aquisição de Mercadorias',
-        data: new Date().toISOString().split('T')[0],
-        tipo_registro: 'imediato',
-        status: 'pago',
-        meio_pagamento: meioPagamento
-      });
-    }
-
-    onAddTransacao(transacoesParaAdicionar);
+    onAddTransacao(transacaoUnica);
 
     setRecentTotal(total);
     setCart([]);
@@ -163,10 +148,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     const totalVendaFinal = valorVenda * revendaQtd;
     const totalCustoFinal = valorCusto * revendaQtd;
 
-    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
-
-    // 1. Lança a entrada da venda no financeiro
-    transacoesParaAdicionar.push({
+    // Create a single transaction representing quick retail sale with integrated product cost
+    const transacaoUnica: Omit<Transacao, 'id'> = {
       tipo: 'entrada',
       descricao: `[Revenda Direta] ${revendaQtd}x ${revendaNome} (Venda: R$ ${valorVenda.toFixed(2)} un)`,
       valor: totalVendaFinal,
@@ -174,24 +157,12 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       data: new Date().toISOString().split('T')[0],
       tipo_registro: 'imediato',
       status: 'pago',
-      meio_pagamento: revendaMeio
-    });
+      meio_pagamento: revendaMeio,
+      custo_venda: registrarCusto ? totalCustoFinal : 0
+      // No itens_venda array since it is not linked to a registered stock product (quick sale)
+    };
 
-    // 2. Se optado, lança a saída automática do custo da compra
-    if (registrarCusto && valorCusto > 0) {
-      transacoesParaAdicionar.push({
-        tipo: 'saida',
-        descricao: `[Custo de Revenda] ${revendaQtd}x ${revendaNome} (Custo: R$ ${valorCusto.toFixed(2)} un)`,
-        valor: totalCustoFinal,
-        categoria: 'Aquisição de Mercadorias',
-        data: new Date().toISOString().split('T')[0],
-        tipo_registro: 'imediato',
-        status: 'pago',
-        meio_pagamento: revendaMeio
-      });
-    }
-
-    onAddTransacao(transacoesParaAdicionar);
+    onAddTransacao(transacaoUnica);
 
     setRecentTotal(totalVendaFinal);
     setSaleSuccess(true);

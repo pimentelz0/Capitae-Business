@@ -19,6 +19,10 @@ export interface Transacao {
   data_vencimento?: string; // ISO date string (YYYY-MM-DD)
   status: 'pago' | 'pendente';
   meio_pagamento?: string; // Pix, Cartão, Dinheiro (optional, for entries)
+  custo_venda?: number; // Embedded cost of products sold
+  produto_id?: string; // If single product or quick sale
+  produto_qtd?: number; // Quantity of the product
+  itens_venda?: { produto_id: string; qtd: number; nome: string }[]; // If multiple items (from PDV cart)
 }
 
 export interface CaixaDiario {

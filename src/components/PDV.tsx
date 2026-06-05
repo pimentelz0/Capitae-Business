@@ -27,7 +27,6 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [revendaQtd, setRevendaQtd] = useState<number>(1);
   const [revendaMeio, setRevendaMeio] = useState<string>('Pix');
   const [registrarCusto, setRegistrarCusto] = useState<boolean>(true);
-  const [registrarCustoEstoque, setRegistrarCustoEstoque] = useState<boolean>(true);
 
   // Categories extraction
   const categories = ['Todos', ...Array.from(new Set(produtos.map(p => p.categoria)))];
@@ -114,7 +113,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       tipo_registro: 'imediato',
       status: 'pago',
       meio_pagamento: meioPagamento,
-      custo_venda: registrarCustoEstoque ? totalCustoEstoque : 0,
+      custo_venda: totalCustoEstoque,
       itens_venda: cart.map(item => ({
         produto_id: item.produto.id,
         qtd: item.qtd,
@@ -148,8 +147,10 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     const totalVendaFinal = valorVenda * revendaQtd;
     const totalCustoFinal = valorCusto * revendaQtd;
 
-    // Create a single transaction representing quick retail sale with integrated product cost
-    const transacaoUnica: Omit<Transacao, 'id'> = {
+    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
+
+    // 1. Lança a entrada de faturamento (com custo_venda embutido na linha)
+    transacoesParaAdicionar.push({
       tipo: 'entrada',
       descricao: `[Revenda Direta] ${revendaQtd}x ${revendaNome} (Venda: R$ ${valorVenda.toFixed(2)} un)`,
       valor: totalVendaFinal,
@@ -158,11 +159,24 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       tipo_registro: 'imediato',
       status: 'pago',
       meio_pagamento: revendaMeio,
-      custo_venda: registrarCusto ? totalCustoFinal : 0
-      // No itens_venda array since it is not linked to a registered stock product (quick sale)
-    };
+      custo_venda: totalCustoFinal
+    });
 
-    onAddTransacao(transacaoUnica);
+    // 2. Lança a saída real do custo de aquisição da mercadoria (pois ela não existia no estoque)
+    if (registrarCusto && totalCustoFinal > 0) {
+      transacoesParaAdicionar.push({
+        tipo: 'saida',
+        descricao: `[Custo de Revenda] ${revendaQtd}x ${revendaNome} (Custo: R$ ${valorCusto.toFixed(2)} un)`,
+        valor: totalCustoFinal,
+        categoria: 'Mercadoria / Estoque',
+        data: new Date().toISOString().split('T')[0],
+        tipo_registro: 'imediato',
+        status: 'pago',
+        meio_pagamento: revendaMeio
+      });
+    }
+
+    onAddTransacao(transacoesParaAdicionar);
 
     setRecentTotal(totalVendaFinal);
     setSaleSuccess(true);
@@ -633,24 +647,6 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                     ))}
                   </div>
                 </div>
-
-                {/* Auto Cost Registration for registered assets */}
-                {totalCustoEstoque > 0 && (
-                  <label className="flex items-start gap-3 cursor-pointer p-3 bg-background/40 hover:bg-background/60 rounded-2xl border border-foreground/5 text-xs text-muted hover:text-white transition-all select-none">
-                    <input
-                      type="checkbox"
-                      checked={registrarCustoEstoque}
-                      onChange={(e) => setRegistrarCustoEstoque(e.target.checked)}
-                      className="rounded border-foreground/10 text-primary focus:ring-primary bg-background w-4 h-4 mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <span className="font-bold block text-white text-[11px] leading-tight">Registrar custo automático (CMV)</span>
-                      <p className="text-[10px] leading-tight text-muted mt-0.5">
-                        Gera uma saída automática de R$ {isPrivateMode ? '•••' : totalCustoEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no caixa para abater do lucro bruto.
-                      </p>
-                    </div>
-                  </label>
-                )}
 
                 {/* Unified Total */}
                 <div className="pt-4 border-t border-foreground/5 flex justify-between items-end">

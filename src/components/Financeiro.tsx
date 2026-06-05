@@ -161,10 +161,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
 
   const totalOutflows = transacoes
     .filter(t => t.tipo === 'saida' && t.status === 'pago' && isMatchPeriod(t.data))
-    .reduce((sum, t) => sum + t.valor, 0) +
-    transacoes
-    .filter(t => t.tipo === 'entrada' && t.status === 'pago' && isMatchPeriod(t.data))
-    .reduce((sum, t) => sum + (t.custo_venda || 0), 0);
+    .reduce((sum, t) => sum + t.valor, 0);
 
   const pendingPayablesVal = contasAPagar.reduce((sum, t) => sum + t.valor, 0);
   const pendingReceivablesVal = contasAReceber.reduce((sum, t) => sum + t.valor, 0);

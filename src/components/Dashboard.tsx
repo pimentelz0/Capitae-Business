@@ -402,6 +402,21 @@ export default function Dashboard({ user }: DashboardProps) {
     };
     const updated = [...produtos, pWithId];
     saveProductsToCache(updated);
+
+    // Auto-generate purchase expense (saída) transaction if purchase cost is positive
+    const totalCustoCompra = (newP.preco_custo || 0) * (newP.quantidade || 0);
+    if (totalCustoCompra > 0) {
+      const autoTrans: Omit<Transacao, 'id'> = {
+        tipo: 'saida',
+        descricao: `[Compra de Estoque] ${newP.nome} (${newP.quantidade} un)`,
+        valor: totalCustoCompra,
+        categoria: 'Mercadoria / Estoque',
+        data: new Date().toISOString().split('T')[0],
+        tipo_registro: 'imediato',
+        status: 'pago'
+      };
+      handleAddTransacao(autoTrans);
+    }
   };
 
   const handleUpdateProduto = (updatedP: Produto) => {

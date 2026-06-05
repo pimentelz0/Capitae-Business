@@ -48,8 +48,7 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
       
       const dayTrans = transacoesPagas.filter(t => t.data === dateStr);
       const faturamento = dayTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + t.valor, 0);
-      const custos = dayTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0) +
-                     dayTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + (t.custo_venda || 0), 0);
+      const custos = dayTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0);
       const lucro = faturamento - custos;
 
       data.push({
@@ -85,8 +84,7 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
       });
 
       const faturamento = monthTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + t.valor, 0);
-      const custos = monthTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0) +
-                     monthTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + (t.custo_venda || 0), 0);
+      const custos = monthTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0);
       const lucro = faturamento - custos;
 
       data.push({

@@ -110,18 +110,25 @@ export default function Dashboard({ user }: DashboardProps) {
         let prodsLoaded = false;
         let transLoaded = false;
 
+        let loadedProds: Produto[] = [];
+        let loadedTrans: Transacao[] = [];
+
         // Products (Fast Local-First Load)
         const cachedProds = localStorage.getItem(prodKey);
         if (cachedProds) {
-          setProdutos(JSON.parse(cachedProds));
-          prodsLoaded = true;
+          try {
+            loadedProds = JSON.parse(cachedProds);
+            prodsLoaded = true;
+          } catch (e) {}
         }
 
         // Transactions (Fast Local-First Load)
         const cachedTrans = localStorage.getItem(transKey);
         if (cachedTrans) {
-          setTransacoes(JSON.parse(cachedTrans));
-          transLoaded = true;
+          try {
+            loadedTrans = JSON.parse(cachedTrans);
+            transLoaded = true;
+          } catch (e) {}
         }
 
         // Real-time Database Hydration Cloud Sync (Only for real registered accounts)
@@ -137,8 +144,7 @@ export default function Dashboard({ user }: DashboardProps) {
             if (!dbError && dbMemories && dbMemories.length > 0) {
               const prodMem = dbMemories.find(m => m.key === 'business_products');
               if (prodMem && prodMem.value) {
-                const parsedProds = JSON.parse(prodMem.value);
-                setProdutos(parsedProds);
+                loadedProds = JSON.parse(prodMem.value);
                 localStorage.setItem(prodKey, prodMem.value);
                 prodsLoaded = true;
                 console.log('Dashboard: Successfully synced products backup from cloud.');
@@ -146,8 +152,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
               const transMem = dbMemories.find(m => m.key === 'business_transactions');
               if (transMem && transMem.value) {
-                const parsedTrans = JSON.parse(transMem.value);
-                setTransacoes(parsedTrans);
+                loadedTrans = JSON.parse(transMem.value);
                 localStorage.setItem(transKey, transMem.value);
                 transLoaded = true;
                 console.log('Dashboard: Successfully synced transactions backup from cloud.');
@@ -163,22 +168,20 @@ export default function Dashboard({ user }: DashboardProps) {
           // If no products exist for this user, check if we have unsaved guest_user products to migrate
           const guestProdsStr = localStorage.getItem('capitae_business_products_guest_user');
           if (guestProdsStr && user.id !== 'guest_user') {
-            const guestProds = JSON.parse(guestProdsStr);
-            setProdutos(guestProds);
-            localStorage.setItem(prodKey, JSON.stringify(guestProds));
+            loadedProds = JSON.parse(guestProdsStr);
+            localStorage.setItem(prodKey, JSON.stringify(loadedProds));
             
             // Sync newly migrated products to the database
             supabase.from('user_memories').upsert([{
               user_id: user.id,
               key: 'business_products',
-              value: JSON.stringify(guestProds),
+              value: JSON.stringify(loadedProds),
               updated_at: new Date().toISOString()
             }], { onConflict: 'user_id,key' }).then(() => {});
           } else {
             // For real logged in users, default to empty list, only seed for guest user
-            const initialProds = user.id === 'guest_user' ? INITIAL_PRODUCTS : [];
-            setProdutos(initialProds);
-            localStorage.setItem(prodKey, JSON.stringify(initialProds));
+            loadedProds = user.id === 'guest_user' ? INITIAL_PRODUCTS : [];
+            localStorage.setItem(prodKey, JSON.stringify(loadedProds));
           }
         }
 
@@ -186,23 +189,70 @@ export default function Dashboard({ user }: DashboardProps) {
           // If no transactions exist for this user, check if we have unsaved guest_user transactions to migrate
           const guestTransStr = localStorage.getItem('capitae_business_transactions_guest_user');
           if (guestTransStr && user.id !== 'guest_user') {
-            const guestTrans = JSON.parse(guestTransStr);
-            setTransacoes(guestTrans);
-            localStorage.setItem(transKey, JSON.stringify(guestTrans));
+            loadedTrans = JSON.parse(guestTransStr);
+            localStorage.setItem(transKey, JSON.stringify(loadedTrans));
 
             // Sync newly migrated transactions to the database
             supabase.from('user_memories').upsert([{
               user_id: user.id,
               key: 'business_transactions',
-              value: JSON.stringify(guestTrans),
+              value: JSON.stringify(loadedTrans),
               updated_at: new Date().toISOString()
             }], { onConflict: 'user_id,key' }).then(() => {});
           } else {
             // For real logged in users, default to empty list, only seed for guest user
-            const initialTrans = user.id === 'guest_user' ? generateInitialTransactions() : [];
-            setTransacoes(initialTrans);
-            localStorage.setItem(transKey, JSON.stringify(initialTrans));
+            loadedTrans = user.id === 'guest_user' ? generateInitialTransactions() : [];
+            localStorage.setItem(transKey, JSON.stringify(loadedTrans));
           }
+        }
+
+        // --- BACKGROUND COG PURCHASE COST BACKFILL ---
+        // Loops through loaded products and makes sure any stocked items mapped to a purchase cost
+        // have an corresponding auto expense paid trans, safely preventing duplicates
+        let updatedTransList = [...loadedTrans];
+        let hasNewTransactions = false;
+
+        loadedProds.forEach(p => {
+          const totalCustoCompra = (p.preco_custo || 0) * (p.quantidade || 0);
+          if (totalCustoCompra > 0) {
+            const hasExpense = updatedTransList.some(t => 
+              t.tipo === 'saida' &&
+              t.categoria === 'Mercadoria / Estoque' &&
+              t.descricao.includes(`[Compra de Estoque] ${p.nome}`)
+            );
+
+            if (!hasExpense) {
+              const newSaida: Transacao = {
+                id: `t_backfill_${p.id}_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+                tipo: 'saida',
+                descricao: `[Compra de Estoque] ${p.nome} (${p.quantidade} un)`,
+                valor: totalCustoCompra,
+                categoria: 'Mercadoria / Estoque',
+                data: new Date().toISOString().split('T')[0],
+                tipo_registro: 'imediato',
+                status: 'pago'
+              };
+              updatedTransList.unshift(newSaida);
+              hasNewTransactions = true;
+            }
+          }
+        });
+
+        // Set stable state models
+        setProdutos(loadedProds);
+        if (hasNewTransactions) {
+          setTransacoes(updatedTransList);
+          localStorage.setItem(transKey, JSON.stringify(updatedTransList));
+          if (user.id !== 'guest_user') {
+            await supabase.from('user_memories').upsert([{
+              user_id: user.id,
+              key: 'business_transactions',
+              value: JSON.stringify(updatedTransList),
+              updated_at: new Date().toISOString()
+            }], { onConflict: 'user_id,key' });
+          }
+        } else {
+          setTransacoes(loadedTrans);
         }
 
         // Setup Onboarding & terms display rules

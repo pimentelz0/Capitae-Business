@@ -6,21 +6,23 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
   // Calculator inputs
   const [custoAquisicao, setCustoAquisicao] = useState<number>(30); // R$ 30,00 cost
   const [despesasOperacionaisValor, setDespesasOperacionaisValor] = useState<number>(5); // R$ 5,00 variable expenses
-  const [lucroLiquidoDesejado, setLucroLiquidoDesejado] = useState<number>(15); // R$ 15,00 desired profit
+  const [margemLucroPct, setMargemLucroPct] = useState<number>(30); // 30% Desired profit margin
 
   // Break-even inputs
   const [despesasFixasMensais, setDespesasFixasMensais] = useState<number>(1500); // R$ 1.500,00 fixed costs
 
-  // Pricing math: Direct cash pricing
-  // Selling Price = Cost + Variable Expenses + Desired Profit
-  const precoSugerido = custoAquisicao + despesasOperacionaisValor + lucroLiquidoDesejado; 
+  // Pricing math: Margem de Lucro calculator
+  // Selling Price = (Custo de Aquisição + Despesas Variáveis Valor) / (1 - margemLucroPct / 100)
+  const precoSugerido = margemLucroPct < 100 
+    ? (custoAquisicao + despesasOperacionaisValor) / (1 - Math.min(99.9, margemLucroPct) / 100)
+    : custoAquisicao + despesasOperacionaisValor;
 
   const markupReal = custoAquisicao > 0 ? precoSugerido / custoAquisicao : 0;
   
   const despesasOperacionaisPct = precoSugerido > 0 ? (despesasOperacionaisValor / precoSugerido) * 100 : 0;
-  const margemLucroDesejadaPct = precoSugerido > 0 ? (lucroLiquidoDesejado / precoSugerido) * 100 : 0;
+  const margemLucroDesejadaPct = margemLucroPct;
   
-  const lucroLiquidoUnitario = lucroLiquidoDesejado;
+  const lucroLiquidoUnitario = Math.max(0, precoSugerido - (custoAquisicao + despesasOperacionaisValor));
   const margemContribuicaoPct = precoSugerido > 0 ? (lucroLiquidoUnitario / precoSugerido) * 100 : 0;
 
   // Break-even math (in units)
@@ -116,30 +118,31 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
               />
             </div>
 
-            {/* Slider 3: Desired gain in R$ */}
+            {/* Slider 3: Desired gain in % */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm font-bold">
-                <label className="text-white font-sans">Margem de Lucro Desejada (R$)</label>
+                <label className="text-white font-sans">Margem de Lucro Desejada (%)</label>
                 <div className="flex items-center gap-1.5 bg-background border border-foreground/5 py-1 px-3.5 rounded-xl">
-                  <span className="text-xs text-muted">R$</span>
+                  <span className="text-xs text-muted">%</span>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    value={lucroLiquidoDesejado || ''}
-                    onChange={(e) => setLucroLiquidoDesejado(Math.max(0, parseFloat(e.target.value) || 0))}
+                    step="1"
+                    min="1"
+                    max="99"
+                    value={margemLucroPct || ''}
+                    onChange={(e) => setMargemLucroPct(Math.min(99, Math.max(1, parseFloat(e.target.value) || 0)))}
                     className="w-16 bg-transparent text-[#00C853] font-extrabold outline-none text-right"
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted">O retorno líquido (lucro) em dinheiro que você quer que sobre para você por unidade vendida.</p>
+              <p className="text-xs text-muted">A porcentagem de margem de lucro líquida desejada sobre o preço de venda final do produto.</p>
               <input
                 type="range"
-                min="0"
-                max="500"
+                min="5"
+                max="95"
                 step="1"
-                value={lucroLiquidoDesejado}
-                onChange={(e) => setLucroLiquidoDesejado(parseFloat(e.target.value))}
+                value={margemLucroPct}
+                onChange={(e) => setMargemLucroPct(parseFloat(e.target.value))}
                 className="w-full accent-primary h-1 bg-background rounded-lg appearance-none cursor-pointer"
               />
             </div>
@@ -148,7 +151,7 @@ export default function Precificacao({ isPrivateMode }: { isPrivateMode: boolean
           {/* Theoretical info alert */}
           <div className="bg-background/40 p-4 border border-foreground/5 rounded-2xl flex items-start gap-2.5 text-xs text-muted">
             <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p><strong>Facilidade de Precificação:</strong> Ao definir todos os valores diretamente em dinheiro (R$), você sabe exatamente quanto cada unidade custa, quanto consome de despesas (como taxas, impostos e embalagens) e quanto sobra de lucro no seu bolso.</p>
+            <p><strong>Facilidade de Precificação:</strong> Ao definir a margem desejada em porcentagem, o preço ideal é ajustado automaticamente de modo a garantir que, após pagar custos de aquisição e despesas variáveis, a porcentagem pretendida de lucro sobre o preço final permaneça no seu caixa.</p>
           </div>
         </div>
 

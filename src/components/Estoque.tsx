@@ -14,6 +14,7 @@ interface EstoqueProps {
 export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDeleteProduto, isPrivateMode }: EstoqueProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProdutoId, setEditingProdutoId] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Produto | null>(null);
 
   // Form states
   const [nome, setNome] = useState('');
@@ -399,7 +400,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => onDeleteProduto(p.id)}
+                              onClick={() => setProductToDelete(p)}
                               className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
                               title="Excluir"
                             >
@@ -416,6 +417,64 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
           )}
         </div>
       </div>
+
+      {/* Custom premium delete confirmation modal overlay */}
+      <AnimatePresence>
+        {productToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/5 rounded-[32px] p-6 shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Excluir do Estoque</h3>
+                  <p className="text-[9px] text-red-400 font-mono uppercase tracking-widest">Ação Irreversível</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <p className="text-xs text-muted leading-relaxed">
+                  Tem certeza que deseja remover o produto <strong className="text-white">{productToDelete.nome}</strong> do seu estoque?
+                </p>
+                {productToDelete.quantidade > 0 && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-2.5 text-[11px] text-red-300">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <p>
+                      Este item tem <strong>{productToDelete.quantidade} un.</strong> no estoque. Excluir apagará seu saldo e valor de custo correspondentes.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setProductToDelete(null)}
+                  className="flex-1 py-3 bg-background border border-foreground/5 hover:bg-foreground/5 text-muted hover:text-white rounded-2xl font-bold transition-all text-xs text-center uppercase cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDeleteProduto(productToDelete.id);
+                    setProductToDelete(null);
+                  }}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-650 text-white font-bold rounded-2xl transition-all text-xs text-center uppercase cursor-pointer"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

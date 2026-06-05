@@ -482,10 +482,8 @@ export default function Dashboard({ user }: DashboardProps) {
   };
 
   const handleDeleteProduto = (id: string) => {
-    if (confirm('Tem certeza de que deseja excluir este produto do estoque?')) {
-      const updated = produtos.filter(p => p.id !== id);
-      saveProductsToCache(updated);
-    }
+    const updated = produtos.filter(p => p.id !== id);
+    saveProductsToCache(updated);
   };
 
   // Onboarding completors

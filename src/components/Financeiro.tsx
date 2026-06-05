@@ -221,7 +221,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-white">
+          <h2 className="text-3xl font-black text-red-500">
             R$ {isPrivateMode ? '••••••' : totalOutflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
           <div className="flex justify-between items-center mt-3 text-[10px] text-muted">
@@ -543,7 +543,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                           <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {t.tipo === 'entrada' ? '+' : '-'} R$ {isPrivateMode ? '•••' : t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
-                          <td className="py-3.5 px-2 text-right text-muted">
+                          <td className="py-3.5 px-2 text-right text-red-500 font-semibold">
                             {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.custo_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
                           </td>
                           <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-red-400/80'}`}>

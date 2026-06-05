@@ -26,7 +26,6 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [revendaVenda, setRevendaVenda] = useState<number | ''>('');
   const [revendaQtd, setRevendaQtd] = useState<number>(1);
   const [revendaMeio, setRevendaMeio] = useState<string>('Pix');
-  const [registrarCusto, setRegistrarCusto] = useState<boolean>(true);
 
   // Categories extraction
   const categories = ['Todos', ...Array.from(new Set(produtos.map(p => p.categoria)))];
@@ -147,10 +146,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     const totalVendaFinal = valorVenda * revendaQtd;
     const totalCustoFinal = valorCusto * revendaQtd;
 
-    const transacoesParaAdicionar: Omit<Transacao, 'id'>[] = [];
-
-    // 1. Lança a entrada de faturamento (com custo_venda embutido na linha)
-    transacoesParaAdicionar.push({
+    // Create a single entry transaction with integrated product cost
+    const transacaoUnica: Omit<Transacao, 'id'> = {
       tipo: 'entrada',
       descricao: `[Revenda Direta] ${revendaQtd}x ${revendaNome} (Venda: R$ ${valorVenda.toFixed(2)} un)`,
       valor: totalVendaFinal,
@@ -160,23 +157,9 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       status: 'pago',
       meio_pagamento: revendaMeio,
       custo_venda: totalCustoFinal
-    });
+    };
 
-    // 2. Lança a saída real do custo de aquisição da mercadoria (pois ela não existia no estoque)
-    if (registrarCusto && totalCustoFinal > 0) {
-      transacoesParaAdicionar.push({
-        tipo: 'saida',
-        descricao: `[Custo de Revenda] ${revendaQtd}x ${revendaNome} (Custo: R$ ${valorCusto.toFixed(2)} un)`,
-        valor: totalCustoFinal,
-        categoria: 'Mercadoria / Estoque',
-        data: new Date().toISOString().split('T')[0],
-        tipo_registro: 'imediato',
-        status: 'pago',
-        meio_pagamento: revendaMeio
-      });
-    }
-
-    onAddTransacao(transacoesParaAdicionar);
+    onAddTransacao(transacaoUnica);
 
     setRecentTotal(totalVendaFinal);
     setSaleSuccess(true);
@@ -505,21 +488,6 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                   </div>
                 </div>
 
-                {/* Toggle registrar custo de compra */}
-                {revendaCusto !== '' && Number(revendaCusto) > 0 && (
-                  <label className="flex items-start gap-3 cursor-pointer p-3 bg-background/20 rounded-2xl border border-foreground/5 text-xs text-muted hover:text-white transition-all select-none">
-                    <input
-                      type="checkbox"
-                      checked={registrarCusto}
-                      onChange={(e) => setRegistrarCusto(e.target.checked)}
-                      className="rounded border-foreground/10 text-primary focus:ring-primary bg-background w-4 h-4 mt-0.5"
-                    />
-                    <div>
-                      <span className="font-bold block text-white">Lançar custo de compra como saída</span>
-                      Gera uma saída automática de R$ {isPrivateMode ? '•••' : ((Number(revendaCusto) || 0) * revendaQtd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no caixa.
-                    </div>
-                  </label>
-                )}
               </div>
 
               {/* Total and Launch Button */}

@@ -132,9 +132,7 @@ export default function NotificationCenter({ userId, theme = 'light', onRedirect
   };
 
   const handleClearAll = () => {
-    if (window.confirm('Deseja realmente limpar todas as notificações?')) {
-      clearAllNotifications(userId);
-    }
+    clearAllNotifications(userId);
   };
 
   const handleToggleNative = async () => {

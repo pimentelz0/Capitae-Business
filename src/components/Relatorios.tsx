@@ -174,7 +174,7 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
         <div className="bg-secondary p-5 border border-foreground/5 rounded-3xl">
           <p className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Custo de Operação / Compras</p>
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-white text-xl">
+            <span className="font-extrabold text-red-500 text-xl">
               R$ {isPrivateMode ? '•••' : totalCustos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>

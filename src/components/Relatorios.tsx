@@ -48,7 +48,15 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
       
       const dayTrans = transacoesPagas.filter(t => t.data === dateStr);
       const faturamento = dayTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + t.valor, 0);
-      const custos = dayTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0);
+      const custos = dayTrans.reduce((sum, t) => {
+        if (t.tipo === 'saida') {
+          return sum + t.valor;
+        }
+        if (t.tipo === 'entrada') {
+          return sum + (t.custo_venda || 0);
+        }
+        return sum;
+      }, 0);
       const lucro = faturamento - custos;
 
       data.push({
@@ -84,7 +92,15 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
       });
 
       const faturamento = monthTrans.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + t.valor, 0);
-      const custos = monthTrans.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + t.valor, 0);
+      const custos = monthTrans.reduce((sum, t) => {
+        if (t.tipo === 'saida') {
+          return sum + t.valor;
+        }
+        if (t.tipo === 'entrada') {
+          return sum + (t.custo_venda || 0);
+        }
+        return sum;
+      }, 0);
       const lucro = faturamento - custos;
 
       data.push({
@@ -102,8 +118,13 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
   // Aggregate Category Outflows
   const categoryOutflows = React.useMemo(() => {
     const map: Record<string, number> = {};
-    transacoesPagas.filter(t => t.tipo === 'saida').forEach(t => {
-      map[t.categoria] = (map[t.categoria] || 0) + t.valor;
+    transacoesPagas.forEach(t => {
+      if (t.tipo === 'saida') {
+        map[t.categoria || 'Outros'] = (map[t.categoria || 'Outros'] || 0) + t.valor;
+      } else if (t.tipo === 'entrada' && t.custo_venda && t.custo_venda > 0) {
+        const cat = t.categoria === 'Revenda' ? 'Mercadoria / Estoque' : t.categoria;
+        map[cat] = (map[cat] || 0) + t.custo_venda;
+      }
     });
 
     return Object.entries(map)

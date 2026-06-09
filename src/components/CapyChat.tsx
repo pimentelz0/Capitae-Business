@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Bot, User, X, Loader2, Sparkles, Plus, MessageSquare as MessageIcon, History, ChevronLeft, Trash2 } from 'lucide-react';
-import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { Type, FunctionDeclaration } from "@google/genai";
 import { getSafeUser, supabase } from '../lib/supabase';
 import ReactMarkdown from 'react-markdown';
 
@@ -629,76 +629,83 @@ export default function CapyChat({ user, expenses, goals, bills, profile, isPro:
         - Você PODE e DEVE realizar análises financeiras complexas sobre os dados de gastos fornecidos.
       `;
 
-      // Helper for API call with streaming logic
-      const callGeminiStreaming = async (maxRetriesPerModel = 2) => {
-        let lastError: any = null;
-        
-        // Use process.env.GEMINI_API_KEY as the primary key source (following skill guidelines)
-        // Fallback to VITE_ version if process.env is not available in browser but was injected
-        const rawKeys = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
-        const apiKeys = rawKeys.split(',').map((k: string) => k.trim()).filter((k: string) => k !== '');
-        
-        if (apiKeys.length === 0) {
-          throw new Error('Não foi possível encontrar uma chave de API válida para o Capy. Por favor, verifique as configurações do sistema.');
+      // Helper for API call with streaming logic calling backend secure endpoint
+      const callGeminiStreaming = async () => {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            recentMessages: recentMessages,
+            systemInstruction: systemInstruction,
+            modelsToTry: modelsToTry,
+            tools: [{ functionDeclarations: [addExpenseTool, addBillTool, updateProfileTool, createGoalTool, allocateToGoalTool, markBillAsPaidTool, saveMemoryTool] }],
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Erro ao conectar com o servidor do Capy: ${errText}`);
         }
 
-        for (const currentModel of modelsToTry) {
-          for (let i = 0; i < maxRetriesPerModel; i++) {
-            const apiKeyToUse = apiKeys[i % apiKeys.length];
-            const genAIInstance = new GoogleGenAI({ apiKey: apiKeyToUse });
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder("utf-8");
+        
+        if (!reader) {
+          throw new Error("Não foi possível iniciar a leitura da resposta do servidor do Capy.");
+        }
 
-            try {
-              const responseStream = await genAIInstance.models.generateContentStream({
-                model: currentModel,
-                contents: recentMessages.map(m => ({
-                  role: m.role === 'capy' ? 'model' : 'user',
-                  parts: [{ text: m.content }]
-                })),
-                config: {
-                  systemInstruction: systemInstruction,
-                  tools: [{ functionDeclarations: [addExpenseTool, addBillTool, updateProfileTool, createGoalTool, allocateToGoalTool, markBillAsPaidTool, saveMemoryTool] }],
-                  temperature: 0.7,
-                  maxOutputTokens: 2048,
+        // Create a placeholder message for the stream
+        const streamMessageId = crypto.randomUUID();
+        setMessages(prev => [...prev, { id: streamMessageId, role: 'capy', content: '' }]);
+
+        let fullText = '';
+        let calls: any[] = [];
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep internal part of last incomplete line
+
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith('data: ')) {
+              try {
+                const jsonStr = cleanLine.substring(6);
+                const parsed = JSON.parse(jsonStr);
+
+                if (parsed.error) {
+                  throw new Error(parsed.error);
                 }
-              });
-              
-              // Create a placeholder message for the stream
-              const streamMessageId = crypto.randomUUID();
-              setMessages(prev => [...prev, { id: streamMessageId, role: 'capy', content: '' }]);
-              
-              let fullText = '';
-              let calls: any[] = [];
 
-              for await (const chunk of responseStream) {
-                const chunkText = chunk.text;
-                if (chunkText) {
-                  fullText += chunkText;
+                if (parsed.text) {
+                  fullText += parsed.text;
                   setMessages(prev => prev.map(m => 
                     m.id === streamMessageId ? { ...m, content: fullText } : m
                   ));
                 }
-                
-                // Collect function calls if any
-                const chunkCalls = chunk.functionCalls;
-                if (chunkCalls) {
-                  calls = [...calls, ...chunkCalls];
+
+                if (parsed.functionCalls) {
+                  calls = [...calls, ...parsed.functionCalls];
+                }
+              } catch (e: any) {
+                console.error("Erro processando chunk do Capy:", e);
+                if (e.message) {
+                  throw e;
                 }
               }
-
-              return { text: fullText, functionCalls: calls.length > 0 ? calls : null };
-            } catch (err: any) {
-              lastError = err;
-              const errorMsg = err.message || '';
-              const isRetryable = errorMsg.includes('429') || errorMsg.includes('503') || errorMsg.includes('UNAVAILABLE');
-              if (isRetryable && i < maxRetriesPerModel - 1) {
-                await new Promise(r => setTimeout(r, 2000));
-                continue;
-              }
-              break;
             }
           }
         }
-        throw lastError;
+
+        return { text: fullText, functionCalls: calls.length > 0 ? calls : null };
       };
 
       const result = await callGeminiStreaming();

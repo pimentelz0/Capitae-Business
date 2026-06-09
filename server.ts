@@ -3,6 +3,8 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from '@supabase/supabase-js';
+import crypto from "crypto";
+import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,8 +75,12 @@ async function startServer() {
 
   console.log('Server: Starting initialization...');
 
-  // Logging middleware
-  app.use(express.json());
+  // Logging middleware with rawBody support for signature validation
+  app.use(express.json({
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf.toString();
+    }
+  }));
   app.use((req, res, next) => {
     console.log(`Server: ${req.method} ${req.url} - User-Agent: ${req.headers['user-agent']}`);
     next();
@@ -108,12 +114,97 @@ async function startServer() {
     });
   });
 
+  // Secure Gemini Chat Proxy Endpoint with full streaming and fallback retry handling
+  app.post("/api/chat", async (req, res) => {
+    const { recentMessages, systemInstruction, modelsToTry, tools, temperature, maxOutputTokens } = req.body;
+
+    if (!recentMessages || !Array.isArray(recentMessages)) {
+      return res.status(400).json({ error: "Missing or invalid recentMessages" });
+    }
+
+    const rawKeys = process.env.GEMINI_API_KEY || '';
+    const apiKeys = rawKeys.split(',').map((k: string) => k.trim()).filter((k: string) => k !== '');
+
+    if (apiKeys.length === 0) {
+      return res.status(500).json({ error: "Não foi possível encontrar uma chave de API válida para o Capy no servidor." });
+    }
+
+    // Set headers for streaming (chunked transfer)
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const models = modelsToTry || ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-flash-latest"];
+    let lastError: any = null;
+    let streamSucceeded = false;
+
+    for (const currentModel of models) {
+      for (let i = 0; i < 2; i++) {
+        const apiKeyToUse = apiKeys[i % apiKeys.length];
+        const ai = new GoogleGenAI({
+          apiKey: apiKeyToUse,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
+
+        try {
+          const responseStream = await ai.models.generateContentStream({
+            model: currentModel,
+            contents: recentMessages.map((m: any) => ({
+              role: m.role === 'capy' ? 'model' : 'user',
+              parts: [{ text: m.content }]
+            })),
+            config: {
+              systemInstruction: systemInstruction,
+              tools: tools || [],
+              temperature: temperature !== undefined ? temperature : 0.7,
+              maxOutputTokens: maxOutputTokens || 2048,
+            }
+          });
+
+          for await (const chunk of responseStream) {
+            // Write each chunk as a simple JSON line
+            const dataLine = JSON.stringify({
+              text: chunk.text || '',
+              functionCalls: chunk.functionCalls || null
+            });
+            res.write(`data: ${dataLine}\n\n`);
+          }
+
+          streamSucceeded = true;
+          break;
+        } catch (err: any) {
+          lastError = err;
+          const errorMsg = err.message || '';
+          const isRetryable = errorMsg.includes('429') || errorMsg.includes('503') || errorMsg.includes('UNAVAILABLE');
+          if (isRetryable && i < 1) {
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+          break;
+        }
+      }
+      if (streamSucceeded) break;
+    }
+
+    if (!streamSucceeded) {
+      console.error("Gemini Proxy Stream Error:", lastError);
+      const errLine = JSON.stringify({ error: lastError?.message || "Internal streaming error" });
+      res.write(`data: ${errLine}\n\n`);
+    }
+
+    res.end();
+  });
+
   // Kiwify Webhook Endpoint
   app.get("/api/webhooks/kiwify", (req, res) => {
     res.send("Webhook endpoint is active! Use POST for Kiwify signals.");
   });
 
-  app.post("/api/webhooks/kiwify", express.json(), async (req, res) => {
+  app.post("/api/webhooks/kiwify", async (req, res) => {
     console.log('--- KIWIFY WEBHOOK RECEIVED ---');
     const payload = req.body;
     
@@ -122,9 +213,31 @@ async function startServer() {
       return res.status(400).json({ error: 'Empty payload' });
     }
 
-    const signature = req.headers['x-kiwify-signature'];
-    console.log('Signature:', signature);
+    const signature = req.headers['x-kiwify-signature'] as string;
+    console.log('Signature Header:', signature);
     console.log('Payload Keys:', Object.keys(payload));
+
+    const kiwifySecret = process.env.KIWIFY_SECRET_TOKEN || process.env.KIWIFY_SECRET || '';
+    if (kiwifySecret) {
+      if (!signature) {
+        console.error('Kiwify Webhook: Missing x-kiwify-signature header');
+        return res.status(401).json({ error: 'Missing signature' });
+      }
+
+      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+      const calculatedSignature = crypto
+        .createHmac('sha256', kiwifySecret)
+        .update(rawBody)
+        .digest('hex');
+
+      if (signature !== calculatedSignature) {
+        console.error('Kiwify Webhook: Signature mismatch');
+        return res.status(401).json({ error: 'Invalid signature signature verification' });
+      }
+      console.log('Kiwify Webhook: Signature verified successfully');
+    } else {
+      console.warn('Kiwify Webhook: KIWIFY_SECRET_TOKEN is not defined. Skipping signature verification.');
+    }
 
     console.log('--- KIWIFY WEBHOOK START ---');
     console.log('Event Type:', payload.order_status);

@@ -128,12 +128,12 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total catalog items */}
         <div className="bg-secondary p-5 rounded-3xl border border-foreground/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 animate-scaleIn">
             <Package className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] text-muted font-bold uppercase">Total de Itens</p>
-            <h3 className="text-2xl font-black text-white">{totalItems}</h3>
+            <p className="text-[9px] text-muted font-black uppercase tracking-widest leading-none mb-1">Total de Itens</p>
+            <h3 className="text-3xl font-black text-white leading-none tracking-tight">{totalItems}</h3>
           </div>
         </div>
 
@@ -143,8 +143,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] text-muted font-bold uppercase">Estoque Baixo</p>
-            <h3 className="text-2xl font-black text-yellow-500">{lowStockItems} itens</h3>
+            <p className="text-[9px] text-muted font-black uppercase tracking-widest leading-none mb-1">Estoque Baixo</p>
+            <h3 className="text-3xl font-black text-yellow-500 leading-none tracking-tight">{lowStockItems} <span className="text-xs text-muted font-medium">itens</span></h3>
           </div>
         </div>
 
@@ -154,8 +154,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
             <AlertCircle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] text-muted font-bold uppercase">Sem Estoque</p>
-            <h3 className="text-2xl font-black text-red-500">{outOfStockItems} itens</h3>
+            <p className="text-[9px] text-muted font-black uppercase tracking-widest leading-none mb-1">Sem Estoque</p>
+            <h3 className="text-3xl font-black text-red-500 leading-none tracking-tight">{outOfStockItems} <span className="text-xs text-muted font-medium">itens</span></h3>
           </div>
         </div>
 
@@ -165,8 +165,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] text-muted font-bold uppercase">Ativo do Estoque</p>
-            <h3 className="text-2xl font-black text-emerald-400">
+            <p className="text-[9px] text-muted font-black uppercase tracking-widest leading-none mb-1">Ativo do Estoque</p>
+            <h3 className="text-3xl font-black text-emerald-400 leading-none tracking-tight">
               R$ {isPrivateMode ? '•••' : investidoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
             </h3>
           </div>

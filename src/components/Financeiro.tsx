@@ -205,16 +205,16 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Faturamento do Período */}
         <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Entradas</span>
+          <div className="flex justify-between items-center mb-5">
+            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Entradas</span>
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-white">
+          <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-white leading-none">
             R$ {isPrivateMode ? '••••••' : totalInflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
-          <div className="flex justify-between items-center mt-3 text-[10px] text-muted">
+          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
             <span>Faturamento Bruto</span>
             <span className="text-emerald-400 font-bold">Liquidado</span>
           </div>
@@ -223,16 +223,16 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
 
         {/* Card 2: Custos / Despesas */}
         <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Saídas</span>
+          <div className="flex justify-between items-center mb-5">
+            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saídas</span>
             <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500">
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-red-500">
+          <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-red-500 leading-none">
             R$ {isPrivateMode ? '••••••' : totalOutflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
-          <div className="flex justify-between items-center mt-3 text-[10px] text-muted">
+          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
             <span>Compras e Despesas</span>
             <span className="text-red-400 font-bold">Pago</span>
           </div>
@@ -241,16 +241,16 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
 
         {/* Card 3: Saldo Final */}
         <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Saldo Líquido</span>
+          <div className="flex justify-between items-center mb-5">
+            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saldo Líquido</span>
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <h2 className={`text-3xl font-black ${saldoFinal < 0 ? 'text-red-500' : 'text-primary'}`}>
+          <h2 className={`text-4xl md:text-[40px] font-black tracking-tight leading-none ${saldoFinal < 0 ? 'text-red-500' : 'text-primary'}`}>
             R$ {isPrivateMode ? '••••••' : saldoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
-          <div className="flex justify-between items-center mt-3 text-[10px] text-muted">
+          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
             <span>Lucro Operacional</span>
             <span className={`${saldoFinal < 0 ? 'text-red-400' : 'text-primary'} font-bold`}>
               {saldoFinal < 0 ? 'Defasagem' : 'Superavit'}

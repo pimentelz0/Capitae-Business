@@ -8,9 +8,10 @@ interface PDVProps {
   onAddTransacao: (transacao: Omit<Transacao, 'id'> | Omit<Transacao, 'id'>[]) => void;
   onUpdateProdutoQuantidade: (id: string, novaQuantidade: number) => void;
   isPrivateMode: boolean;
+  onAddProduto?: (produto: Omit<Produto, 'id'>) => void;
 }
 
-export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidade, isPrivateMode }: PDVProps) {
+export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidade, isPrivateMode, onAddProduto }: PDVProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [cart, setCart] = useState<{ produto: Produto; qtd: number }[]>([]);
@@ -18,6 +19,43 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [meioPagamento, setMeioPagamento] = useState<string>('Pix');
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [recentTotal, setRecentTotal] = useState(0);
+
+  // New Product Modal States
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [nome, setNome] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [quantidade, setQuantidade] = useState<number>(0);
+  const [estoqueMinimo, setEstoqueMinimo] = useState<number>(5);
+  const [precoCusto, setPrecoCusto] = useState<number>(0);
+  const [precoVenda, setPrecoVenda] = useState<number>(0);
+
+  const handleProductSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim() || !categoria.trim() || quantidade < 0 || precoCusto < 0 || precoVenda < 0) {
+      alert('Preencha os campos obrigatórios com valores válidos.');
+      return;
+    }
+
+    if (onAddProduto) {
+      onAddProduto({
+        nome,
+        categoria,
+        quantidade,
+        estoque_minimo: estoqueMinimo,
+        preco_custo: precoCusto,
+        preco_venda: precoVenda
+      });
+    }
+
+    // Reset clean-up
+    setNome('');
+    setCategoria('');
+    setQuantidade(0);
+    setEstoqueMinimo(5);
+    setPrecoCusto(0);
+    setPrecoVenda(0);
+    setShowAddForm(false);
+  };
 
   // Revenda Rápida States
   const [pdvMode, setPdvMode] = useState<'estoque' | 'revenda'>('estoque');
@@ -250,7 +288,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
               }`}
             >
               <RefreshCw className="w-3.5 h-3.5 text-primary" />
-              Revenda Rápida (Sem Estoque)
+              Venda Avulsa
             </button>
           </div>
 
@@ -294,7 +332,17 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                   <div className="bg-secondary/50 border border-dashed border-foreground/5 p-12 rounded-3xl text-center text-muted">
                     <AlertCircle className="w-10 h-10 text-muted/40 mx-auto mb-3" />
                     <p className="text-sm font-medium">Nenhum produto encontrado.</p>
-                    <p className="text-xs mt-1">Adicione itens no Controle de Estoque primeiro.</p>
+                    <p className="text-xs mt-1 mb-4">Adicione itens no Controle de Estoque ou cadastre um novo produto diretamente aqui.</p>
+                    {onAddProduto && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddForm(true)}
+                        className="px-5 py-2.5 bg-primary hover:bg-opacity-90 active:scale-98 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 mx-auto cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4 font-black" />
+                        Cadastrar Produto
+                      </button>
+                    )}
                   </div>
                 ) : (
                   filteredProducts.map(p => {
@@ -355,12 +403,12 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
               </div>
             </>
           ) : (
-            /* Revenda Rápida Direct Mode Form */
+            /* Venda Avulsa Direct Mode Form */
             <form onSubmit={handleFinalizeRevenda} className="bg-secondary border border-foreground/5 p-6 rounded-[32px] space-y-6">
               <div>
                 <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-                  Nova Revenda sem Estoque
+                  Nova Venda Avulsa
                 </h3>
                 <p className="text-xs text-muted mt-1">Lançamento direto de produtos de oportunidade sem precisar atualizar o estoque.</p>
               </div>
@@ -398,7 +446,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Preço de Revenda (un)</label>
+                    <label className="text-xs text-muted font-bold uppercase tracking-wider block">Preço de Venda (un)</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">R$</span>
                       <input
@@ -503,7 +551,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                   className="w-full sm:w-auto px-6 py-3.5 bg-primary hover:bg-opacity-95 text-slate-950 font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-[0_4px_20px_rgba(0,200,83,0.25)] flex items-center justify-center gap-2 active:scale-98"
                 >
                   <Check className="w-4 h-4 font-black" />
-                  Lançar Revenda
+                  Lançar Venda
                 </button>
               </div>
             </form>
@@ -636,6 +684,129 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
           </form>
         </div>
       </div>
+
+      {/* Slide down Product Entry Modal Overlay */}
+      <AnimatePresence>
+        {showAddForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
+            <div className="relative w-full max-w-3xl bg-secondary border border-foreground/5 rounded-[32px] shadow-2xl overflow-hidden animate-fadeIn my-auto">
+              <div className="p-6 border-b border-foreground/5 bg-background/60 flex justify-between items-center relative z-10">
+                <h3 className="font-bold text-base text-white">
+                  Cadastrar Novo Produto (Festa de Cadastro)
+                </h3>
+                <button 
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="text-xs text-muted hover:text-white bg-foreground/5 px-3 py-1.5 rounded-xl transition-all hover:bg-foreground/10 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <form onSubmit={handleProductSubmit} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[80vh] overflow-y-auto relative z-10">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Nome do Produto*</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Coca-Cola Lata 350ml, Camiseta Polo G..."
+                      value={nome}
+                      onChange={(e) => setNome(e.target.value)}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Categoria*</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Bebidas, Roupas, Serviços, Alimentos..."
+                      value={categoria}
+                      onChange={(e) => setCategoria(e.target.value)}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Quantidade Atual em Estoque*</label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      value={quantidade || ''}
+                      onChange={(e) => setQuantidade(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-bold transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Estoque Mínimo de Alerta</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={estoqueMinimo || ''}
+                      onChange={(e) => setEstoqueMinimo(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Preço de Custo (R$)*</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="0,00"
+                        value={precoCusto || ''}
+                        onChange={(e) => setPrecoCusto(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-black text-red-400 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Preço de Venda (R$)*</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="0,00"
+                        value={precoVenda || ''}
+                        onChange={(e) => setPrecoVenda(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-black text-emerald-400 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(false)}
+                      className="flex-1 py-3.5 bg-background border border-foreground/5 hover:bg-foreground/5 text-muted hover:text-white rounded-2xl font-bold transition-all text-xs text-center uppercase cursor-pointer"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3.5 bg-primary text-background font-bold rounded-2xl transition-all hover:bg-opacity-95 text-xs text-center uppercase cursor-pointer"
+                    >
+                      Salvar Item
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

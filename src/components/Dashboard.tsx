@@ -538,6 +538,7 @@ export default function Dashboard({ user }: DashboardProps) {
             onAddTransacao={handleAddTransacao}
             onUpdateProdutoQuantidade={handleUpdateProdutoQuantidade}
             isPrivateMode={isPrivateMode}
+            onAddProduto={handleAddProduto}
           />
         );
       case 'financeiro':
@@ -602,15 +603,15 @@ export default function Dashboard({ user }: DashboardProps) {
           <div className="flex items-center">
             <button 
               onClick={() => setIsMenuOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted"
+              className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted"
               title="Abrir Menu / Perfil"
             >
-              <Menu className="w-5 h-5" />
-              <div className="w-7 h-7 bg-secondary rounded-full overflow-hidden border border-foreground/10 flex items-center justify-center">
+              <Menu className="w-4.5 h-4.5" />
+              <div className="w-5.5 h-5.5 bg-secondary rounded-full overflow-hidden border border-foreground/10 flex items-center justify-center">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Perfil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <UserIcon className="w-4 h-4 text-muted" />
+                  <UserIcon className="w-3 h-3 text-muted" />
                 )}
               </div>
             </button>
@@ -618,10 +619,10 @@ export default function Dashboard({ user }: DashboardProps) {
 
           {/* Center part: Centered Title and Subtitle */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-            <h2 className="text-base font-black tracking-tight text-white font-sans sm:text-lg md:text-xl whitespace-nowrap">
+            <h2 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white dark:text-white font-sans whitespace-nowrap drop-shadow-[0_0_12px_rgba(0,200,83,0.1)]">
               Capitae Business
             </h2>
-            <p className="text-[8px] sm:text-[9px] text-primary font-bold uppercase tracking-widest mt-0.5 whitespace-nowrap">
+            <p className="text-[7.5px] sm:text-[8.5px] text-primary font-black uppercase tracking-[0.16em] mt-0.5 whitespace-nowrap">
               Gestor de Negócios
             </p>
           </div>
@@ -687,8 +688,8 @@ export default function Dashboard({ user }: DashboardProps) {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-8 overscroll-contain">
-                <div className="space-y-1.5">
+              <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-10 overscroll-contain">
+                <div className="space-y-3">
                   {[
                     { id: 'pdv', label: 'Caixa', icon: <ShoppingCart /> },
                     { id: 'financeiro', label: 'Fluxo de Caixa', icon: <TrendingUp /> },
@@ -702,24 +703,28 @@ export default function Dashboard({ user }: DashboardProps) {
                         setActiveTab(item.id as any);
                         setIsMenuOpen(false);
                       }}
-                      className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all text-sm ${
-                        activeTab === item.id ? 'bg-primary text-background' : 'text-muted hover:bg-foreground/5'
+                      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all text-sm border ${
+                        activeTab === item.id 
+                          ? 'bg-[#002f1a]/80 text-[#00E676] border-[#00E676]/20 shadow-[inset_0_1px_1px_rgba(0,230,118,0.15)] shadow-md' 
+                          : 'text-muted hover:text-white hover:bg-foreground/5 border-transparent'
                       }`}
                     >
-                      {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
+                      {React.cloneElement(item.icon as React.ReactElement<any>, { className: `w-5 h-5 ${activeTab === item.id ? 'text-[#00E676] filter drop-shadow-[0_0_6px_rgba(0,230,118,0.4)]' : ''}` })}
                       {item.label}
                     </button>
                   ))}
                 </div>
 
-                <div className="space-y-2 pt-4 border-t border-foreground/5">
+                <div className="space-y-3 pt-4 border-t border-foreground/5">
                   <button 
                     onClick={() => {
                       setActiveTab('profile');
                       setIsMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all text-sm ${
-                      activeTab === 'profile' ? 'bg-primary text-background' : 'text-muted hover:bg-foreground/5'
+                    className={`w-full flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all text-sm border ${
+                      activeTab === 'profile' 
+                        ? 'bg-[#002f1a]/80 text-[#00E676] border-[#00E676]/20 shadow-[inset_0_1px_1px_rgba(0,230,118,0.15)] shadow-md' 
+                        : 'text-muted hover:text-white hover:bg-foreground/5 border-transparent'
                     }`}
                   >
                     <UserIcon className="w-5 h-5" />
@@ -912,14 +917,16 @@ function NavButton({ active, onClick, icon, label }: NavButtonProps) {
   return (
     <button 
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 transition-colors relative ${active ? 'text-primary' : 'text-muted hover:text-white'}`}
+      className={`flex flex-col items-center gap-1 transition-all relative ${active ? 'text-primary' : 'text-muted hover:text-white'}`}
     >
-      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6 transition-transform hover:scale-105' })}
-      <span className="text-[9px] font-extrabold uppercase tracking-widest">{label}</span>
+      {React.cloneElement(icon as React.ReactElement<any>, { 
+        className: `w-5.5 h-5.5 transition-transform hover:scale-105 ${active ? 'drop-shadow-[0_0_8px_rgba(0,200,83,0.55)] filter' : ''}` 
+      })}
+      <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-[0.08em] mt-0.5">{label}</span>
       {active && (
         <motion.div 
           layoutId="nav-glow-indicator"
-          className="absolute -bottom-2 w-3 h-1 bg-primary rounded-full blur-[2px]"
+          className="absolute -bottom-2 w-3.5 h-1 bg-primary rounded-full blur-[1px]"
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         />
       )}

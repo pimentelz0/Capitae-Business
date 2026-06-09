@@ -180,52 +180,52 @@ export default function Relatorios({ transacoes, isPrivateMode }: RelatoriosProp
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Faturamento bruto */}
         <div className="bg-secondary p-5 border border-foreground/5 rounded-3xl">
-          <p className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Volumetria de Caixa</p>
+          <p className="text-[9.5px] text-muted font-black uppercase tracking-widest mb-1.5">Volumetria de Caixa</p>
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-white text-xl">
+            <span className="font-black text-white text-2xl sm:text-3xl tracking-tight leading-none">
               R$ {isPrivateMode ? '•••' : totalFaturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[10px] text-emerald-400 font-bold mt-1.5 flex items-center gap-1">
+          <p className="text-[10px] text-emerald-400 font-bold mt-2.5 flex items-center gap-1">
             <TrendingUp className="w-3 h-3" /> Faturamento Bruto totalizado
           </p>
         </div>
 
         {/* Custos operacionais */}
         <div className="bg-secondary p-5 border border-foreground/5 rounded-3xl">
-          <p className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Custo de Operação / Compras</p>
+          <p className="text-[9.5px] text-muted font-black uppercase tracking-widest mb-1.5">Custos / Compras</p>
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-red-500 text-xl">
+            <span className="font-black text-red-500 text-2xl sm:text-3xl tracking-tight leading-none">
               R$ {isPrivateMode ? '•••' : totalCustos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[10px] text-red-400 font-bold mt-1.5 flex items-center gap-1">
-            <TrendingDown className="w-3 h-3" /> Gastos e mercadorias compradas
+          <p className="text-[10px] text-red-400 font-bold mt-2.5 flex items-center gap-1">
+            <TrendingDown className="w-3 h-3" /> Gastos e mercadorias
           </p>
         </div>
 
         {/* Lucro Líquido */}
         <div className="bg-secondary p-5 border border-foreground/5 rounded-3xl">
-          <p className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Resultado Líquido Final</p>
+          <p className="text-[9.5px] text-muted font-black uppercase tracking-widest mb-1.5">Resultado Líquido</p>
           <div className="flex items-center gap-2">
-            <span className={`font-black text-xl ${totalMargemLíquida >= 0 ? 'text-primary' : 'text-red-500'}`}>
+            <span className={`font-black text-2xl sm:text-3xl tracking-tight leading-none ${totalMargemLíquida >= 0 ? 'text-primary' : 'text-red-500'}`}>
               R$ {isPrivateMode ? '•••' : totalMargemLíquida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${totalMargemLíquida >= 0 ? 'text-primary' : 'text-red-400'}`}>
+          <p className={`text-[10px] font-bold mt-2.5 flex items-center gap-1 ${totalMargemLíquida >= 0 ? 'text-primary' : 'text-red-400'}`}>
             <ArrowUpRight className="w-3 h-3" /> {totalMargemLíquida >= 0 ? 'Lucro Líquido Realizado' : 'Prejuízo Operacional'}
           </p>
         </div>
 
         {/* Margem nominal */}
         <div className="bg-secondary p-5 border border-foreground/5 rounded-3xl">
-          <p className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Margem de Lucratividade</p>
+          <p className="text-[9.5px] text-muted font-black uppercase tracking-widest mb-1.5">Margem de Lucro</p>
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-white text-xl">
+            <span className="font-black text-white text-2xl sm:text-3xl tracking-tight leading-none">
               {margemLucroPct.toFixed(1)}%
             </span>
           </div>
-          <p className="text-[10px] text-muted font-medium mt-1.5">
+          <p className="text-[10px] text-muted font-medium mt-2.5">
             Eficiência líquida das vendas
           </p>
         </div>

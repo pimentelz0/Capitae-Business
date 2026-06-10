@@ -106,9 +106,30 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
       // 2. Direct client-side Supabase query fallback (essential for Vercel/static deploys)
       if (!loadedFromApi) {
         console.log('Fetching users directly from Supabase...');
-        const { data: supabaseProfiles, error: supabaseError } = await supabase
-          .from('profiles')
-          .select('*');
+        let supabaseProfiles: any[] | null = null;
+        let supabaseError: any = null;
+
+        // Try executing RPC function to retrieve users securely bypassing client RLS
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('admin_get_users');
+          if (!rpcError && Array.isArray(rpcData)) {
+            supabaseProfiles = rpcData;
+          } else {
+            console.warn('RPC admin_get_users error or not available, falling back to direct table select...', rpcError);
+            const { data: tableData, error: tableError } = await supabase
+              .from('profiles')
+              .select('*');
+            supabaseProfiles = tableData;
+            supabaseError = tableError;
+          }
+        } catch (rpcErr) {
+          console.warn('RPC admin_get_users failed, falling back to database select:', rpcErr);
+          const { data: tableData, error: tableError } = await supabase
+            .from('profiles')
+            .select('*');
+          supabaseProfiles = tableData;
+          supabaseError = tableError;
+        }
 
         if (supabaseError) {
           throw supabaseError;
@@ -175,17 +196,34 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
           throw new Error('Não é permitido remover privilégios de um Administrador.');
         }
 
-        const { error: dbError } = await supabase
-          .from('profiles')
-          .update({
-            is_premium: nextStatus,
-            is_pro: nextStatus,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', targetUserId);
+        // Try calling the RPC to toggle value with SECURITY DEFINER
+        try {
+          const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_toggle_premium', {
+            target_user_id: targetUserId,
+            next_status: nextStatus
+          });
+          if (!rpcError && rpcResult && rpcResult.success) {
+            updatedSuccessfully = true;
+          } else {
+            console.warn('RPC admin_toggle_premium failed, falling back to direct table update:', rpcError);
+          }
+        } catch (rpcErr) {
+          console.warn('RPC admin_toggle_premium failed with error, falling back to direct table update:', rpcErr);
+        }
 
-        if (dbError) throw dbError;
-        updatedSuccessfully = true;
+        if (!updatedSuccessfully) {
+          const { error: dbError } = await supabase
+            .from('profiles')
+            .update({
+              is_premium: nextStatus,
+              is_pro: nextStatus,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetUserId);
+
+          if (dbError) throw dbError;
+          updatedSuccessfully = true;
+        }
       }
 
       if (updatedSuccessfully) {

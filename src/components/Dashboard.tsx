@@ -380,6 +380,9 @@ export default function Dashboard({ user }: DashboardProps) {
           if (dbProfile.is_premium || isUserAdmin) {
             setIsPremium(true);
             localStorage.setItem(`capitae_premium_${user.id}`, 'true');
+          } else {
+            setIsPremium(false);
+            localStorage.setItem(`capitae_premium_${user.id}`, 'false');
           }
           
           // If the profile says they have seen onboarding, don't show it even if localStorage was empty

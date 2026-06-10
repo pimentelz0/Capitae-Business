@@ -114,6 +114,97 @@ async function startServer() {
     });
   });
 
+  // Get all registered users bypasses client-side RLS via service client
+  app.get("/api/admin/users", async (req, res) => {
+    const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
+    const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+    
+    if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
+      console.warn(`Admin access denied for email: ${adminEmail}`);
+      return res.status(403).json({ error: "Acesso negado. Administrador não autenticado." });
+    }
+
+    const client = getSupabase();
+    if (!client) {
+      return res.status(500).json({ error: "Não foi possível conectar com o banco de dados." });
+    }
+
+    try {
+      const { data, error } = await client
+        .from('profiles')
+        .select('*');
+
+      if (error) throw error;
+
+      // Normalize statuses so admins always appear as PRO
+      const normalized = (data || []).map((usr: any) => {
+        const emailLower = (usr.email || '').toLowerCase();
+        const isAdmin = ADMIN_EMAILS.includes(emailLower) || emailLower.includes('josueamorim906') || emailLower.includes('caiogabriel1995');
+        const isPremiumOrPro = usr.is_premium === true || usr.is_pro === true || isAdmin;
+
+        return {
+          ...usr,
+          is_premium: isPremiumOrPro,
+          is_pro: isPremiumOrPro
+        };
+      });
+
+      return res.json(normalized);
+    } catch (err: any) {
+      console.error('Server get users error:', err);
+      return res.status(500).json({ error: err.message || "Erro desconhecido" });
+    }
+  });
+
+  // Toggle user premium status
+  app.post("/api/admin/users/toggle-premium", async (req, res) => {
+    const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
+    const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+
+    if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    const { targetUserId, currentStatus } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ error: "ID do usuário não especificado." });
+    }
+
+    const client = getSupabase();
+    if (!client) {
+      return res.status(500).json({ error: "Banco de dados não configurado." });
+    }
+
+    try {
+      const { data: targetUser } = await client
+        .from('profiles')
+        .select('email')
+        .eq('id', targetUserId)
+        .maybeSingle();
+
+      if (targetUser && targetUser.email && ADMIN_EMAILS.includes(targetUser.email.toLowerCase())) {
+        return res.status(400).json({ error: "Não é permitido remover privilégios de um Administrador." });
+      }
+
+      const nextStatus = !currentStatus;
+
+      const { error } = await client
+        .from('profiles')
+        .update({
+          is_premium: nextStatus,
+          is_pro: nextStatus
+        })
+        .eq('id', targetUserId);
+
+      if (error) throw error;
+
+      return res.json({ success: true, newStatus: nextStatus });
+    } catch (err: any) {
+      console.error('Server toggle status error:', err);
+      return res.status(500).json({ error: err.message || "Erro interno" });
+    }
+  });
+
   // Secure Gemini Chat Proxy Endpoint with full streaming and fallback retry handling
   app.post("/api/chat", async (req, res) => {
     const { recentMessages, systemInstruction, modelsToTry, tools, temperature, maxOutputTokens } = req.body;

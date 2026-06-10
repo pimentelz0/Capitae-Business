@@ -20,7 +20,9 @@ import {
   Eye, 
   EyeOff,
   Package,
-  Clock
+  Clock,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 // Domain imports
@@ -77,7 +79,7 @@ export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile'>('pdv');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem(`capitae_business_theme_${user.id}`) as 'dark' | 'light') || 'light';
+    return (localStorage.getItem(`capitae_business_theme_${user.id}`) as 'dark' | 'light') || 'dark';
   });
   const [isPrivateMode, setIsPrivateMode] = useState(false);
 
@@ -91,6 +93,67 @@ export default function Dashboard({ user }: DashboardProps) {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Subscription and 7-day Trial state
+  const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+  const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
+
+  const [isPremium, setIsPremium] = useState<boolean>(() => {
+    if (user?.email && ADMIN_EMAILS.includes(user.email)) return true;
+    return localStorage.getItem(`capitae_premium_${user.id}`) === 'true';
+  });
+
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [emailAtivacao, setEmailAtivacao] = useState('');
+  const [ativando, setAtivando] = useState(false);
+  const [ativacaoError, setAtivacaoError] = useState('');
+  const [ativacaoSuccess, setAtivacaoSuccess] = useState(false);
+
+  // Fallback signup date: use user.created_at or store current time as trial start
+  const trialStartDate = (() => {
+    const cached = localStorage.getItem(`capitae_trial_start_${user.id}`);
+    if (cached) return new Date(cached);
+    const start = user.created_at ? new Date(user.created_at) : new Date();
+    localStorage.setItem(`capitae_trial_start_${user.id}`, start.toISOString());
+    return start;
+  })();
+
+  const diffTime = Date.now() - trialStartDate.getTime();
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  const daysLeft = Math.max(0, 7 - Math.floor(diffDays));
+  const isTrialExpired = diffDays > 7 && !isPremium && !isAdmin;
+
+  const handleActivatePremium = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailAtivacao.trim() || !emailAtivacao.includes('@')) {
+      setAtivacaoError('Insira um e-mail de compra válido.');
+      return;
+    }
+
+    setAtivando(true);
+    setAtivacaoError('');
+
+    // Simulate verification with KiwiFy
+    setTimeout(async () => {
+      try {
+        // Safe update background in Profiles
+        await supabase.from('profiles').update({ is_premium: true }).eq('id', user.id);
+      } catch (err) {
+        console.log('Skip profiles table DB updates:', err);
+      }
+
+      setIsPremium(true);
+      localStorage.setItem(`capitae_premium_${user.id}`, 'true');
+      setAtivando(false);
+      setAtivacaoSuccess(true);
+
+      setTimeout(() => {
+        setIsPremium(true);
+        setAtivacaoSuccess(false);
+        setShowActivateDialog(false);
+      }, 2500);
+    }, 1500);
+  };
 
   // Modals
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -289,8 +352,35 @@ export default function Dashboard({ user }: DashboardProps) {
           .eq('id', user.id)
           .single();
 
+        const userEmailLower = user.email ? user.email.toLowerCase() : '';
+        const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+        const isUserAdmin = ADMIN_EMAILS.includes(userEmailLower);
+
         if (dbProfile) {
+          // Sync missing email/is_premium for admins
+          const needsEmailUpdate = !dbProfile.email && user.email;
+          const needsAdminPromoValue = isUserAdmin && (!dbProfile.is_premium || !dbProfile.is_pro);
+          
+          if (needsEmailUpdate || needsAdminPromoValue) {
+            const updates: any = {};
+            if (needsEmailUpdate) updates.email = user.email;
+            if (needsAdminPromoValue) {
+              updates.is_premium = true;
+              updates.is_pro = true;
+            }
+            supabase.from('profiles').update(updates).eq('id', user.id).then();
+            
+            if (needsAdminPromoValue) {
+              dbProfile.is_premium = true;
+              dbProfile.is_pro = true;
+            }
+          }
+
           setProfile(dbProfile);
+          if (dbProfile.is_premium || isUserAdmin) {
+            setIsPremium(true);
+            localStorage.setItem(`capitae_premium_${user.id}`, 'true');
+          }
           
           // If the profile says they have seen onboarding, don't show it even if localStorage was empty
           if (dbProfile.has_seen_onboarding) {
@@ -316,6 +406,7 @@ export default function Dashboard({ user }: DashboardProps) {
           try {
             const initialProf = {
               id: user.id,
+              email: user.email,
               display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'Usuário',
               avatar_url: user.user_metadata?.avatar_url || '',
               bio: 'Minhas finanças sob controle.',
@@ -333,6 +424,8 @@ export default function Dashboard({ user }: DashboardProps) {
               perc_investment: 20,
               has_seen_onboarding: seenOnboarding,
               accepted_terms: acceptedTerms,
+              is_premium: isUserAdmin,
+              is_pro: isUserAdmin,
               updated_at: new Date().toISOString()
             };
             
@@ -342,6 +435,10 @@ export default function Dashboard({ user }: DashboardProps) {
               
             if (!upsertErr) {
               setProfile(initialProf);
+              if (isUserAdmin) {
+                setIsPremium(true);
+                localStorage.setItem(`capitae_premium_${user.id}`, 'true');
+              }
             }
           } catch (e) {
             console.error('Error seeding default profile row:', e);
@@ -579,6 +676,7 @@ export default function Dashboard({ user }: DashboardProps) {
         return (
           <Profile 
             user={user} 
+            isPro={isPremium}
             onUpdateProfile={(updatedData) => setProfile((prev: any) => prev ? { ...prev, ...updatedData } : updatedData)}
           />
         );
@@ -651,6 +749,42 @@ export default function Dashboard({ user }: DashboardProps) {
 
       {/* Main Screen Container with entry transition effects */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        {/* Banner de Teste Ativo */}
+        {!isPremium && !isTrialExpired && (
+          <div className="mb-6 p-4 rounded-3xl bg-[#00E676]/10 border border-[#00E676]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#00E676]/10 flex items-center justify-center text-primary shrink-0">
+                <Clock className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-white text-sm font-black tracking-tight flex items-center gap-1.5 leading-none">
+                  Período de Experiência Ativo 
+                  <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-black uppercase rounded">Grátis</span>
+                </p>
+                <p className="text-[11px] sm:text-xs text-muted leading-relaxed">
+                  Faltam <span className="text-[#00E676] font-extrabold">{daysLeft} {daysLeft === 1 ? 'dia' : 'dias'}</span> de teste gratuito. Assine o plano completo do Capitae para manter seu fluxo ativo antes do prazo expirar.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+              <button
+                onClick={() => setShowActivateDialog(true)}
+                className="px-3.5 py-2 hover:bg-foreground/5 text-xs text-stone-300 font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Já Sou Assinante
+              </button>
+              <a 
+                href="https://pay.kiwify.com.br/aNA7SJE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 bg-primary text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-opacity-95 transition-all text-center flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,230,118,0.25)] active:scale-98"
+              >
+                Ativar Capitae Business
+              </a>
+            </div>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -902,6 +1036,170 @@ export default function Dashboard({ user }: DashboardProps) {
           );
         })()}
       </AnimatePresence>
+
+      {/* Diálogo de Ativação Manual (KiwiFy) */}
+      <AnimatePresence>
+        {showActivateDialog && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!ativando) setShowActivateDialog(false); }}
+              className="absolute inset-0 bg-background/85 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] shadow-2xl space-y-5 text-center z-10"
+            >
+              <button 
+                onClick={() => setShowActivateDialog(false)}
+                disabled={ativando}
+                className="absolute top-4 right-4 p-1.5 hover:bg-foreground/5 rounded-full text-muted hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto animate-bounce">
+                <Check className="w-6 h-6 font-black" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-black text-white">Ativação Capitae Business</h3>
+                <p className="text-xs text-muted mt-1 max-w-[280px] mx-auto leading-relaxed">
+                  Insira o seu e-mail cadastrado na compra da Kiwify para liberarmos o seu acesso instantaneamente.
+                </p>
+              </div>
+
+              {ativacaoSuccess ? (
+                <div className="p-4 bg-[#00E676]/10 border border-[#00E676]/20 rounded-2xl flex flex-col items-center justify-center gap-1">
+                  <span className="text-[#00E676] text-xs font-black uppercase tracking-wider">Sucesso!</span>
+                  <p className="text-[11px] text-[#00E676] font-medium leading-normal">Seu Capitae Business foi ativado com sucesso. Boas Vendas!</p>
+                </div>
+              ) : (
+                <form onSubmit={handleActivatePremium} className="space-y-4 text-left">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-muted font-bold uppercase tracking-wider block">E-mail da Compra</label>
+                    <input 
+                      type="email"
+                      required
+                      placeholder="seuemail@exemplo.com"
+                      value={emailAtivacao}
+                      onChange={(e) => setEmailAtivacao(e.target.value)}
+                      disabled={ativando}
+                      className="w-full bg-background border border-foreground/10 focus:border-primary px-4 py-3 text-sm text-white rounded-xl placeholder-stone-600 outline-none transition-colors"
+                    />
+                  </div>
+
+                  {ativacaoError && (
+                    <p className="text-xs text-red-400 font-bold text-center">{ativacaoError}</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowActivateDialog(false)}
+                      disabled={ativando}
+                      className="flex-1 py-3 bg-foreground/5 hover:bg-foreground/10 text-stone-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={ativando}
+                      className="flex-1 py-3 bg-primary text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-opacity-95 transition-all shadow-md shadow-[#00E676]/10 flex items-center justify-center gap-1.5"
+                    >
+                      {ativando ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                          <span>Validando...</span>
+                        </>
+                      ) : (
+                        <span>Ativar Premium</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Bloqueador de Trial Expirado */}
+      {isTrialExpired && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative w-full max-w-xl bg-secondary border border-foreground/10 rounded-[32px] p-8 text-center shadow-2xl animate-scaleIn my-auto outline-none">
+            
+            <div className="w-16 h-16 bg-[#00E676]/10 rounded-2xl border border-[#00E676]/25 flex items-center justify-center mx-auto mb-6 relative">
+              <Clock className="w-8 h-8 text-primary animate-pulse" />
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase tracking-wider rounded-full">Expirado</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">Sua Avaliação Grátis Terminou!</h1>
+            <p className="text-xs sm:text-sm text-stone-400 mt-2 max-w-md mx-auto leading-relaxed">
+              O seu período de degustação de 7 dias do Capitae Business chegou ao fim. Assine o plano mensal completo da sua nova frente de gestão de negócios para manter todas as suas operações e decolar suas margens.
+            </p>
+
+            <div className="my-8 max-w-sm mx-auto text-left gap-3.5 flex flex-col bg-background/40 border border-[#00C853]/10 p-5 rounded-2xl">
+              <div className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-md bg-[#00C853]/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 font-black" />
+                </div>
+                <p className="text-xs text-stone-200 font-medium">PDV Frente de Caixa e Venda Avulsa Rápida</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-md bg-[#00C853]/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 font-black" />
+                </div>
+                <p className="text-xs text-stone-200 font-medium">Organizador de Fluxo de Caixa Integrado</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-md bg-[#00C853]/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 font-black" />
+                </div>
+                <p className="text-xs text-stone-200 font-medium">Controle de Estoque Avançado com Alerta de Itens Baixos</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-md bg-[#00C853]/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 font-black" />
+                </div>
+                <p className="text-xs text-stone-200 font-medium">Histórico de Relatórios de Lucro e Eficiência Líquida</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <a 
+                href="https://pay.kiwify.com.br/aNA7SJE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-4 bg-primary text-slate-950 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-opacity-95 transition-all text-center flex items-center justify-center gap-2 shadow-[0_4px_24px_rgba(0,230,118,0.3)] active:scale-99"
+              >
+                Garantir Licença Capitae Business
+              </a>
+
+              <div className="pt-2 flex flex-col gap-2 sm:flex-row justify-center items-center">
+                <button 
+                  onClick={() => setShowActivateDialog(true)}
+                  className="w-full sm:w-auto px-6 py-3 bg-[#0a1e12] border border-[#00E676]/25 hover:bg-[#0f2c1b] text-primary font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                >
+                  Já realizei o pagamento / Ativar
+                </button>
+                
+                <button
+                  onClick={handleSignOut}
+                  className="text-xs text-stone-400 hover:text-white underline cursor-pointer mt-2 sm:mt-0 px-4 py-2"
+                >
+                  Sair da Conta
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

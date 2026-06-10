@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSafeUser, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Camera, Save, Loader2, LogOut, Mail, Info, CheckCircle2, Zap, Lock, AlertTriangle } from 'lucide-react';
+import { User, Camera, Save, Loader2, LogOut, Mail, Info, CheckCircle2, Zap, Lock, AlertTriangle, Clock, Shield, Search, RefreshCw, UserCheck, UserX } from 'lucide-react';
 
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -61,9 +61,71 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  // Admin configurations and State
+  const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+  const isAdminUser = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
+
+  const [allProfiles, setAllProfiles] = useState<any[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [profileSearch, setProfileSearch] = useState('');
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchProfile().catch(err => console.error('Profile: Error in fetchProfile:', err));
+    if (isAdminUser) {
+      fetchAllProfiles().catch(err => console.error('Profile: Error in fetchAllProfiles:', err));
+    }
   }, []);
+
+  const fetchAllProfiles = async () => {
+    if (!isAdminUser || !user?.email) return;
+    setLoadingProfiles(true);
+    try {
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'x-admin-email': user.email
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Falha ao sincronizar usuários do servidor.');
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setAllProfiles(data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar todos os perfis:', err);
+    } finally {
+      setLoadingProfiles(false);
+    }
+  };
+
+  const toggleUserPremium = async (targetUserId: string, currentStatus: boolean) => {
+    if (!user?.email) return;
+    setUpdatingUserId(targetUserId);
+    try {
+      const response = await fetch('/api/admin/users/toggle-premium', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-email': user.email
+        },
+        body: JSON.stringify({ targetUserId, currentStatus })
+      });
+      
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao atualizar status do usuário');
+      }
+
+      // Update locally
+      setAllProfiles(prev => prev.map(p => p.id === targetUserId ? { ...p, is_premium: result.newStatus, is_pro: result.newStatus } : p));
+    } catch (err: any) {
+      alert('Erro ao atualizar status do usuário: ' + err.message);
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -372,13 +434,25 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
           </label>
         </div>
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            <h3 className="text-xl font-bold">{profile.display_name || 'Seu Nome'}</h3>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            <h3 className="text-xl font-black text-white">{profile.display_name || 'Seu Nome'}</h3>
+            {isAdminUser ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-gradient-to-r from-amber-500/20 to-[#00E676]/20 text-primary border border-primary/40 rounded-full font-black text-[9px] tracking-widest uppercase shadow-[0_0_12px_rgba(0,230,118,0.25)] select-none animate-pulse">
+                <Shield className="w-3 h-3 text-primary shrink-0" />
+                ADMIN PRO
+              </span>
+            ) : isPro ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-gradient-to-r from-emerald-500/20 to-primary/20 text-[#00E676] border border-[#00E676]/30 rounded-full font-black text-[9px] tracking-widest uppercase shadow-[0_0_12px_rgba(0,230,118,0.15)] select-none">
+                <Zap className="w-3 h-3 fill-[#00E676]" />
+                PRO
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 bg-foreground/5 text-muted border border-foreground/10 rounded-full font-black text-[9px] tracking-widest uppercase select-none">
+                FREE
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-2">
-            <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20 uppercase tracking-widest">
-              {profile.level || 'Estrategista'}
-            </span>
             <span className="text-xs text-muted flex items-center gap-1">
               <Mail className="w-3 h-3" /> {userEmail}
             </span>
@@ -434,6 +508,215 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
           </button>
         </div>
       </div>
+
+      {/* Plano & Assinatura */}
+      <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 space-y-6">
+        <div className="flex items-center gap-2 border-b border-foreground/5 pb-4">
+          <Zap className="w-5 h-5 text-primary" />
+          <h4 className="font-bold text-white text-base">Plano & Assinatura</h4>
+        </div>
+
+        {isAdminUser ? (
+          <div className="p-5 bg-gradient-to-r from-amber-500/10 to-primary/10 border border-primary/25 rounded-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-black tracking-tight">Administrador Permanente</p>
+                <p className="text-[11px] text-primary font-black uppercase tracking-wider">Acesso Vitalício PRO Ativo</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed pt-2 border-t border-primary/10">
+              Você está conectado como um dos administradores nativos do sistema Capitae Business. Seu acesso à licença PRO é permanente, ilimitado e vitalício. Use o Painel Administrativo de Controle logo abaixo para conceder, gerenciar e conferir as assinaturas dos demais usuários.
+            </p>
+          </div>
+        ) : isPro ? (
+          <div className="p-5 bg-primary/5 border border-primary/20 rounded-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-black tracking-tight">Capitae PRO Ativo</p>
+                <p className="text-[11px] text-[#00E676] font-extrabold uppercase">Acesso Ilimitado Aberto</p>
+              </div>
+            </div>
+            <p className="text-xs text-stone-300 leading-relaxed pt-2 border-t border-primary/10">
+              Seu Capitae Business está ativo no plano integral mensal! Obrigado por apoiar e gerenciar seu negócio conosco. Todas as frentes de caixa (PDV), fluxo de caixa, estoque e relatórios estão totalmente liberadas.
+            </p>
+          </div>
+        ) : (
+          <div className="p-5 bg-background/50 border border-foreground/10 rounded-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-bold tracking-tight">Período de Experiência Grátis</p>
+                <p className="text-[11px] text-muted uppercase font-black tracking-widest text-[9px]">Apenas 7 dias de teste</p>
+              </div>
+            </div>
+            <p className="text-xs text-stone-400 leading-relaxed pt-2 border-t border-foreground/10">
+              Você está utilizando o período experimental gratuito do Capitae Business. Mude para a assinatura completa para garantir seu acesso definitivo, manter seus dados sob total controle e expandir as margens do seu negócio.
+            </p>
+            <div className="pt-2">
+              <a 
+                href="https://pay.kiwify.com.br/aNA7SJE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-4 bg-primary text-slate-950 text-xs font-black text-center uppercase tracking-widest rounded-2xl hover:bg-opacity-95 transition-all shadow-[0_4px_12px_rgba(0,230,118,0.25)]"
+              >
+                Garantir Licença Capitae PRO
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Painel do Administrador (Visível somente para Administradores permitidos) */}
+      {isAdminUser && (
+        <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 space-y-6">
+          <div className="flex items-center justify-between border-b border-foreground/5 pb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <h4 className="font-bold text-white text-base">Painel do Administrador</h4>
+            </div>
+            <button
+              onClick={fetchAllProfiles}
+              disabled={loadingProfiles}
+              className="p-2 hover:bg-foreground/5 rounded-xl text-muted hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+              title="Atualizar lista de usuários"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingProfiles ? 'animate-spin text-primary' : ''}`} />
+              Sincronizar
+            </button>
+          </div>
+
+          <p className="text-xs text-muted leading-relaxed">
+            Como administrador, você pode visualizar todos os usuários cadastrados e gerenciar de forma autônoma o acesso às licenças PRO do Capitae Business em tempo real.
+          </p>
+
+          {/* Estatísticas administrativas */}
+          <div className="grid grid-cols-3 gap-2 px-1">
+            <div className="bg-background/40 border border-foreground/5 p-3 rounded-2xl text-center space-y-0.5">
+              <span className="text-[9px] text-muted font-bold uppercase tracking-widest block">Cadastros</span>
+              <span className="text-lg font-black text-white">{allProfiles.length}</span>
+            </div>
+            <div className="bg-background/40 border border-emerald-500/10 p-3 rounded-2xl text-center space-y-0.5">
+              <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest block">Assinantes PRO</span>
+              <span className="text-lg font-black text-[#00E676]">
+                {allProfiles.filter(p => p.is_premium).length}
+              </span>
+            </div>
+            <div className="bg-background/40 border border-foreground/5 p-3 rounded-2xl text-center space-y-0.5">
+              <span className="text-[9px] text-muted font-bold uppercase tracking-widest block">Gratuitos</span>
+              <span className="text-lg font-black text-stone-400">
+                {allProfiles.filter(p => !p.is_premium).length}
+              </span>
+            </div>
+          </div>
+
+          {/* Barra de Pesquisa */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-muted absolute left-4 top-3.5" />
+            <input
+              type="text"
+              placeholder="Pesquisar por nome de exibição..."
+              value={profileSearch}
+              onChange={(e) => setProfileSearch(e.target.value)}
+              className="w-full bg-background border border-foreground/10 focus:border-primary pl-11 pr-4 py-3 text-xs text-white rounded-xl placeholder-stone-600 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Lista de usuários */}
+          <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+            {loadingProfiles ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <span className="text-xs text-muted">Carregando usuários cadastrados...</span>
+              </div>
+            ) : allProfiles.length === 0 ? (
+              <div className="text-center py-6 text-xs text-muted">Nenhum perfil encontrado no banco de dados.</div>
+            ) : (() => {
+              const filtered = allProfiles.filter(p => 
+                (p.display_name || 'Sem nome').toLowerCase().includes(profileSearch.toLowerCase()) ||
+                (p.email || '').toLowerCase().includes(profileSearch.toLowerCase())
+              );
+
+              if (filtered.length === 0) {
+                return <div className="text-center py-6 text-xs text-muted">Nenhum resultado para a pesquisa.</div>;
+              }
+
+              return filtered.map((usr) => {
+                return (
+                  <div 
+                    key={usr.id} 
+                    className="p-3 bg-background/50 border border-white/5 rounded-2xl flex items-center justify-between gap-3 hover:border-white/10 transition-all animate-fadeIn"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-secondary border border-foreground/5 overflow-hidden flex items-center justify-center shrink-0">
+                        {usr.avatar_url ? (
+                          <img src={usr.avatar_url} alt="" className="w-full h-full object-cover animate-scaleIn" referrerPolicy="no-referrer" />
+                        ) : (
+                          <User className="w-4 h-4 text-muted" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-black text-white leading-none">
+                            {usr.display_name || 'Usuário Sem Nome'}
+                          </span>
+                          {usr.id === user.id && (
+                            <span className="px-1 py-0.5 bg-primary/10 text-primary text-[8px] font-black rounded uppercase">Você</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted leading-relaxed max-w-[170px] truncate">
+                          {usr.email || ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {usr.is_premium ? (
+                        <span className="px-2 py-1 bg-emerald-500/10 text-[#00E676] border border-emerald-500/20 text-[9px] font-black rounded-lg uppercase tracking-wider select-none">
+                          PRO
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-foreground/5 text-muted border border-foreground/10 text-[9px] font-black rounded-lg uppercase tracking-wider select-none">
+                          FREE
+                        </span>
+                      )}
+
+                      {/* Botão de Conceder/Remover acesso (exceto si mesmo se for admin) */}
+                      {usr.id !== user.id && (
+                        <button
+                          onClick={() => toggleUserPremium(usr.id, usr.is_premium)}
+                          disabled={updatingUserId === usr.id}
+                          className={`p-2 rounded-xl transition-all outline-none focus:ring-1 focus:ring-primary cursor-pointer border ${
+                            usr.is_premium 
+                              ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 text-red-400' 
+                              : 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20 text-[#00E676]'
+                          }`}
+                          title={usr.is_premium ? 'Remover Licença PRO' : 'Conceder Acesso PRO'}
+                        >
+                          {updatingUserId === usr.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : usr.is_premium ? (
+                            <UserX className="w-3.5 h-3.5" />
+                          ) : (
+                            <UserCheck className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Alterar Senha */}
       <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 space-y-6">

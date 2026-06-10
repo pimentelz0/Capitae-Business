@@ -37,7 +37,7 @@ export default function Auth() {
           }
         });
         if (error) throw error;
-        setSuccess('Link de confirmação enviado com sucesso! Por favor, verifique sua caixa de entrada e também a pasta de Lixo Eletrônico/Spam. (Dica de Administrador: Se o e-mail demorar a chegar devido aos limites do servidor gratuito do Supabase, você pode conectar o seu próprio serviço de SMTP como Resend ou Brevo no painel do Supabase).');
+        setSuccess('Link de confirmação enviado com sucesso! Por favor, verifique sua caixa de entrada e também a pasta de Lixo Eletrônico/Spam.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -62,7 +62,7 @@ export default function Auth() {
       if (isRateLimit) {
         setError('Calma lá, você atingiu o limite de tentativas, tente novamente em 1h. Em breve estaremos melhorando esse serviço!');
       } else if (isEmailNotConfirmed) {
-        setError('E-mail não confirmado! Por segurança, é necessário confirmar seu e-mail antes de fazer login. Verifique sua pasta de Spam ou Lixo Eletrônico. (Dica de Administrador: Para garantir que os e-mails cheguem instantaneamente ao Gmail dos seus usuários, configure um serviço de SMTP próprio em seu painel do Supabase em Project Settings -> Auth -> SMTP Settings).');
+        setError('E-mail não confirmado! Por segurança, é necessário confirmar seu e-mail antes de fazer login. Verifique sua pasta de Spam ou Lixo Eletrônico.');
       } else if (isInvalidCreds) {
         setError('E-mail ou senha incorretos. Por favor, verifique suas credenciais.');
       } else if (isAlreadyRegistered) {

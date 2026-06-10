@@ -64,11 +64,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
   // Admin configurations and State
   const ADMIN_EMAILS = [
     'caiogabriel1995@gmail.com', 
-    'josueamorim906@gmail.com', 
-    'ruanvictordacostademedeiros@gmail.com', 
-    'mvitor8585@gmail.com', 
-    'karolgoncallo@gmail.com', 
-    'cabrallohan74@gmail.com'
+    'josueamorim906@gmail.com'
   ];
   const isAdminUser = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
   const sqlEmailList = ADMIN_EMAILS.map(e => `'${e}'`).join(', ');
@@ -1018,7 +1014,10 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
 
                 <div className="relative bg-[#0d0e10] p-4 rounded-2xl border border-white/5 font-mono text-xs overflow-x-auto max-h-60 mt-3 select-all">
                   <pre className="text-emerald-400">
-{`CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
+{`DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
+DROP FUNCTION IF EXISTS public.admin_get_users();
+
+CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
 RETURNS JSONB
 SECURITY DEFINER
 SET search_path = public
@@ -1063,7 +1062,10 @@ $$ LANGUAGE plpgsql;`}
                   <button
                     type="button"
                     onClick={() => {
-                      const sql = `CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
+                      const sql = `DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
+DROP FUNCTION IF EXISTS public.admin_get_users();
+
+CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
 RETURNS JSONB
 SECURITY DEFINER
 SET search_path = public

@@ -119,11 +119,7 @@ async function startServer() {
     const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
     const ADMIN_EMAILS = [
       'caiogabriel1995@gmail.com', 
-      'josueamorim906@gmail.com', 
-      'ruanvictordacostademedeiros@gmail.com', 
-      'mvitor8585@gmail.com', 
-      'karolgoncallo@gmail.com', 
-      'cabrallohan74@gmail.com'
+      'josueamorim906@gmail.com'
     ];
     
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
@@ -168,11 +164,7 @@ async function startServer() {
     const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
     const ADMIN_EMAILS = [
       'caiogabriel1995@gmail.com', 
-      'josueamorim906@gmail.com', 
-      'ruanvictordacostademedeiros@gmail.com', 
-      'mvitor8585@gmail.com', 
-      'karolgoncallo@gmail.com', 
-      'cabrallohan74@gmail.com'
+      'josueamorim906@gmail.com'
     ];
 
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {

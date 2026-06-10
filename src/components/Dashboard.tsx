@@ -97,11 +97,7 @@ export default function Dashboard({ user }: DashboardProps) {
   // Subscription and 7-day Trial state
   const ADMIN_EMAILS = [
     'caiogabriel1995@gmail.com', 
-    'josueamorim906@gmail.com', 
-    'ruanvictordacostademedeiros@gmail.com', 
-    'mvitor8585@gmail.com', 
-    'karolgoncallo@gmail.com', 
-    'cabrallohan74@gmail.com'
+    'josueamorim906@gmail.com'
   ];
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
 
@@ -362,11 +358,7 @@ export default function Dashboard({ user }: DashboardProps) {
         const userEmailLower = user.email ? user.email.toLowerCase() : '';
         const ADMIN_EMAILS = [
           'caiogabriel1995@gmail.com', 
-          'josueamorim906@gmail.com', 
-          'ruanvictordacostademedeiros@gmail.com', 
-          'mvitor8585@gmail.com', 
-          'karolgoncallo@gmail.com', 
-          'cabrallohan74@gmail.com'
+          'josueamorim906@gmail.com'
         ];
         const isUserAdmin = ADMIN_EMAILS.includes(userEmailLower);
 

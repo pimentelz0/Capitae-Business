@@ -397,6 +397,20 @@ async function startServer() {
       return res.status(200).send('Status ignored');
     }
 
+    // 1. Record/Update the status in the kiwify_payments table securely
+    try {
+      console.log(`Kiwify Webhook: Securing payment inside kiwify_payments table for ${userEmail} with status ${payload.order_status}`);
+      await client
+        .from('kiwify_payments')
+        .upsert({
+          email: userEmail,
+          status: payload.order_status,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'email' });
+    } catch (paymentErr) {
+      console.warn('Kiwify Webhook: Error registering in kiwify_payments (this is normal if table is not created yet):', paymentErr);
+    }
+
     try {
       const { data: profile, error: fetchError } = await client
         .from('profiles')

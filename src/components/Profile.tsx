@@ -1014,8 +1014,61 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
 
                 <div className="relative bg-[#0d0e10] p-4 rounded-2xl border border-white/5 font-mono text-xs overflow-x-auto max-h-60 mt-3 select-all">
                   <pre className="text-emerald-400">
-{`DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
+{`CREATE TABLE IF NOT EXISTS public.kiwify_payments (
+  email TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  used_by_user_id UUID REFERENCES auth.users(id)
+);
+
+ALTER TABLE public.kiwify_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow read for anyone" ON public.kiwify_payments;
+CREATE POLICY "Allow read for anyone" ON public.kiwify_payments FOR SELECT USING (true);
+
+DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
 DROP FUNCTION IF EXISTS public.admin_get_users();
+DROP FUNCTION IF EXISTS public.activate_kiwify_premium(TEXT);
+
+CREATE OR REPLACE FUNCTION public.activate_kiwify_premium(buyer_email TEXT)
+RETURNS JSONB
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_id UUID;
+  payment_row RECORD;
+BEGIN
+  current_user_id := auth.uid();
+  
+  IF current_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Usuário não autenticado');
+  END IF;
+
+  SELECT * INTO payment_row FROM public.kiwify_payments WHERE LOWER(email) = LOWER(buyer_email) LIMIT 1;
+  
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Nenhuma compra ativa encontrada com este e-mail na Kiwify. Se você acabou de comprar, aguarde 2 minutos e tente novamente.');
+  END IF;
+
+  IF NOT (payment_row.status IN ('paid', 'approved', 'renewed', 'succeeded')) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'O pagamento deste e-mail na Kiwify não está ativo ou foi cancelado.');
+  END IF;
+
+  IF payment_row.used_by_user_id IS NOT NULL AND payment_row.used_by_user_id <> current_user_id THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Este e-mail de compra já está em uso por outro perfil do Capitae.');
+  END IF;
+
+  UPDATE public.kiwify_payments
+  SET used_by_user_id = current_user_id
+  WHERE LOWER(email) = LOWER(buyer_email);
+
+  UPDATE public.profiles
+  SET is_premium = true, is_pro = true, updated_at = NOW()
+  WHERE id = current_user_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
 RETURNS JSONB
@@ -1062,8 +1115,61 @@ $$ LANGUAGE plpgsql;`}
                   <button
                     type="button"
                     onClick={() => {
-                      const sql = `DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
+                      const sql = `CREATE TABLE IF NOT EXISTS public.kiwify_payments (
+  email TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  used_by_user_id UUID REFERENCES auth.users(id)
+);
+
+ALTER TABLE public.kiwify_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow read for anyone" ON public.kiwify_payments;
+CREATE POLICY "Allow read for anyone" ON public.kiwify_payments FOR SELECT USING (true);
+
+DROP FUNCTION IF EXISTS public.admin_toggle_premium(UUID, BOOLEAN);
 DROP FUNCTION IF EXISTS public.admin_get_users();
+DROP FUNCTION IF EXISTS public.activate_kiwify_premium(TEXT);
+
+CREATE OR REPLACE FUNCTION public.activate_kiwify_premium(buyer_email TEXT)
+RETURNS JSONB
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_id UUID;
+  payment_row RECORD;
+BEGIN
+  current_user_id := auth.uid();
+  
+  IF current_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Usuário não autenticado');
+  END IF;
+
+  SELECT * INTO payment_row FROM public.kiwify_payments WHERE LOWER(email) = LOWER(buyer_email) LIMIT 1;
+  
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Nenhuma compra ativa encontrada com este e-mail na Kiwify. Se você acabou de comprar, aguarde 2 minutos e tente novamente.');
+  END IF;
+
+  IF NOT (payment_row.status IN ('paid', 'approved', 'renewed', 'succeeded')) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'O pagamento deste e-mail na Kiwify não está ativo ou foi cancelado.');
+  END IF;
+
+  IF payment_row.used_by_user_id IS NOT NULL AND payment_row.used_by_user_id <> current_user_id THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Este e-mail de compra já está em uso por outro perfil do Capitae.');
+  END IF;
+
+  UPDATE public.kiwify_payments
+  SET used_by_user_id = current_user_id
+  WHERE LOWER(email) = LOWER(buyer_email);
+
+  UPDATE public.profiles
+  SET is_premium = true, is_pro = true, updated_at = NOW()
+  WHERE id = current_user_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
 RETURNS JSONB

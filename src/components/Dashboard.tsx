@@ -128,7 +128,8 @@ export default function Dashboard({ user }: DashboardProps) {
 
   const handleActivatePremium = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailAtivacao.trim() || !emailAtivacao.includes('@')) {
+    const cleanEmail = emailAtivacao.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setAtivacaoError('Insira um e-mail de compra válido.');
       return;
     }
@@ -136,26 +137,39 @@ export default function Dashboard({ user }: DashboardProps) {
     setAtivando(true);
     setAtivacaoError('');
 
-    // Simulate verification with KiwiFy
-    setTimeout(async () => {
-      try {
-        // Safe update background in Profiles
-        await supabase.from('profiles').update({ is_premium: true }).eq('id', user.id);
-      } catch (err) {
-        console.log('Skip profiles table DB updates:', err);
+    try {
+      // Call the secure RPC function in Supabase
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('activate_kiwify_premium', {
+        buyer_email: cleanEmail
+      });
+
+      if (rpcError) {
+        throw rpcError;
       }
 
-      setIsPremium(true);
-      localStorage.setItem(`capitae_premium_${user.id}`, 'true');
-      setAtivando(false);
-      setAtivacaoSuccess(true);
+      const result = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult;
 
-      setTimeout(() => {
+      if (result && result.success) {
         setIsPremium(true);
-        setAtivacaoSuccess(false);
-        setShowActivateDialog(false);
-      }, 2500);
-    }, 1500);
+        localStorage.setItem(`capitae_premium_${user.id}`, 'true');
+        setAtivacaoSuccess(true);
+        
+        // Update local profile state
+        setProfile(prev => prev ? { ...prev, is_premium: true, is_pro: true } : null);
+
+        setTimeout(() => {
+          setAtivacaoSuccess(false);
+          setShowActivateDialog(false);
+        }, 2500);
+      } else {
+        setAtivacaoError(result?.error || 'Não foi possível validar este e-mail de compra na Kiwify.');
+      }
+    } catch (err: any) {
+      console.error('Error executing activate_kiwify_premium RPC:', err);
+      setAtivacaoError(err.message || 'Erro de comunicação ao validar a ativação. Tente de novo.');
+    } finally {
+      setAtivando(false);
+    }
   };
 
   // Modals
@@ -362,28 +376,52 @@ export default function Dashboard({ user }: DashboardProps) {
         ];
         const isUserAdmin = ADMIN_EMAILS.includes(userEmailLower);
 
+        // Check if there is an active purchase in kiwify_payments for this email
+        let autoPremium = false;
+        try {
+          const { data: payRecord } = await supabase
+            .from('kiwify_payments')
+            .select('*')
+            .eq('email', userEmailLower)
+            .maybeSingle();
+
+          if (payRecord && ['paid', 'approved', 'renewed'].includes(payRecord.status)) {
+            if (!payRecord.used_by_user_id || payRecord.used_by_user_id === user.id) {
+              autoPremium = true;
+              
+              // Associate it if not already done
+              if (!payRecord.used_by_user_id) {
+                supabase.from('kiwify_payments').update({ used_by_user_id: user.id }).eq('email', userEmailLower).then();
+              }
+            }
+          }
+        } catch (err) {
+          console.log('Error auto checking kiwify_payments table:', err);
+        }
+
         if (dbProfile) {
-          // Sync missing email/is_premium for admins
+          // Sync missing email/is_premium for admins or autoPremium users
           const needsEmailUpdate = !dbProfile.email && user.email;
           const needsAdminPromoValue = isUserAdmin && (!dbProfile.is_premium || !dbProfile.is_pro);
+          const needsAutoPremiumValue = autoPremium && (!dbProfile.is_premium || !dbProfile.is_pro);
           
-          if (needsEmailUpdate || needsAdminPromoValue) {
+          if (needsEmailUpdate || needsAdminPromoValue || needsAutoPremiumValue) {
             const updates: any = {};
             if (needsEmailUpdate) updates.email = user.email;
-            if (needsAdminPromoValue) {
+            if (needsAdminPromoValue || needsAutoPremiumValue) {
               updates.is_premium = true;
               updates.is_pro = true;
             }
             supabase.from('profiles').update(updates).eq('id', user.id).then();
             
-            if (needsAdminPromoValue) {
+            if (needsAdminPromoValue || needsAutoPremiumValue) {
               dbProfile.is_premium = true;
               dbProfile.is_pro = true;
             }
           }
 
           setProfile(dbProfile);
-          if (dbProfile.is_premium || isUserAdmin) {
+          if (dbProfile.is_premium || dbProfile.is_pro || isUserAdmin || autoPremium) {
             setIsPremium(true);
             localStorage.setItem(`capitae_premium_${user.id}`, 'true');
           } else {
@@ -433,8 +471,8 @@ export default function Dashboard({ user }: DashboardProps) {
               perc_investment: 20,
               has_seen_onboarding: seenOnboarding,
               accepted_terms: acceptedTerms,
-              is_premium: isUserAdmin,
-              is_pro: isUserAdmin,
+              is_premium: isUserAdmin || autoPremium,
+              is_pro: isUserAdmin || autoPremium,
               updated_at: new Date().toISOString()
             };
             
@@ -444,7 +482,7 @@ export default function Dashboard({ user }: DashboardProps) {
               
             if (!upsertErr) {
               setProfile(initialProf);
-              if (isUserAdmin) {
+              if (isUserAdmin || autoPremium) {
                 setIsPremium(true);
                 localStorage.setItem(`capitae_premium_${user.id}`, 'true');
               }

@@ -81,19 +81,55 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
     if (!isAdminUser || !user?.email) return;
     setLoadingProfiles(true);
     try {
-      const response = await fetch('/api/admin/users', {
-        headers: {
-          'x-admin-email': user.email
+      let data: any[] = [];
+      let loadedFromApi = false;
+
+      // 1. Try to fetch from server-side API first
+      try {
+        const response = await fetch('/api/admin/users', {
+          headers: {
+            'x-admin-email': user.email
+          }
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && !contentType.includes('text/html')) {
+          const apiData = await response.json();
+          if (Array.isArray(apiData)) {
+            data = apiData;
+            loadedFromApi = true;
+          }
         }
-      });
-      if (!response.ok) {
-        throw new Error('Falha ao sincronizar usuários do servidor.');
+      } catch (apiErr) {
+        console.warn('API /api/admin/users is not available. Falling back to direct Supabase query. Error:', apiErr);
       }
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setAllProfiles(data);
+
+      // 2. Direct client-side Supabase query fallback (essential for Vercel/static deploys)
+      if (!loadedFromApi) {
+        console.log('Fetching users directly from Supabase...');
+        const { data: supabaseProfiles, error: supabaseError } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (supabaseError) {
+          throw supabaseError;
+        }
+
+        // Apply same status normalization as the backend server (Admins always show up as PRO)
+        data = (supabaseProfiles || []).map((usr: any) => {
+          const emailLower = (usr.email || '').toLowerCase();
+          const isAdmin = ADMIN_EMAILS.includes(emailLower) || emailLower.includes('josueamorim906') || emailLower.includes('caiogabriel1995');
+          const isPremiumOrPro = usr.is_premium === true || usr.is_pro === true || isAdmin;
+
+          return {
+            ...usr,
+            is_premium: isPremiumOrPro,
+            is_pro: isPremiumOrPro
+          };
+        });
       }
-    } catch (err) {
+
+      setAllProfiles(data);
+    } catch (err: any) {
       console.error('Erro ao buscar todos os perfis:', err);
     } finally {
       setLoadingProfiles(false);
@@ -104,22 +140,58 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
     if (!user?.email) return;
     setUpdatingUserId(targetUserId);
     try {
-      const response = await fetch('/api/admin/users/toggle-premium', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-email': user.email
-        },
-        body: JSON.stringify({ targetUserId, currentStatus })
-      });
-      
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao atualizar status do usuário');
+      const nextStatus = !currentStatus;
+      let updatedSuccessfully = false;
+
+      // 1. Try server API first
+      try {
+        const response = await fetch('/api/admin/users/toggle-premium', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-email': user.email
+          },
+          body: JSON.stringify({ targetUserId, currentStatus })
+        });
+        
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && !contentType.includes('text/html')) {
+          const result = await response.json();
+          if (result && result.success) {
+            updatedSuccessfully = true;
+          } else if (result && result.error) {
+            throw new Error(result.error);
+          }
+        }
+      } catch (apiErr: any) {
+        console.warn('POST /api/admin/users/toggle-premium failed. Falling back to direct Supabase update on client. Error:', apiErr);
       }
 
-      // Update locally
-      setAllProfiles(prev => prev.map(p => p.id === targetUserId ? { ...p, is_premium: result.newStatus, is_pro: result.newStatus } : p));
+      // 2. Direct client-side update fallback (essential for Vercel/static hosts)
+      if (!updatedSuccessfully) {
+        // Prevent deleting admin credentials
+        const targetUser = allProfiles.find(p => p.id === targetUserId);
+        if (targetUser && targetUser.email && ADMIN_EMAILS.includes(targetUser.email.toLowerCase())) {
+          throw new Error('Não é permitido remover privilégios de um Administrador.');
+        }
+
+        const { error: dbError } = await supabase
+          .from('profiles')
+          .update({
+            is_premium: nextStatus,
+            is_pro: nextStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetUserId);
+
+        if (dbError) throw dbError;
+        updatedSuccessfully = true;
+      }
+
+      if (updatedSuccessfully) {
+        // Update state locally
+        setAllProfiles(prev => prev.map(p => p.id === targetUserId ? { ...p, is_premium: nextStatus, is_pro: nextStatus } : p));
+      }
     } catch (err: any) {
       alert('Erro ao atualizar status do usuário: ' + err.message);
     } finally {

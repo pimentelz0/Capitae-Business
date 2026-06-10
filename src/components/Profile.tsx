@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSafeUser, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Camera, Save, Loader2, LogOut, Mail, Info, CheckCircle2, Zap, Lock, AlertTriangle, Clock, Shield, Search, RefreshCw, UserCheck, UserX } from 'lucide-react';
+import { User, Camera, Save, Loader2, LogOut, Mail, Info, CheckCircle2, Zap, Lock, AlertTriangle, Clock, Shield, Search, RefreshCw, UserCheck, UserX, Copy } from 'lucide-react';
 
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -62,13 +62,24 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Admin configurations and State
-  const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+  const ADMIN_EMAILS = [
+    'caiogabriel1995@gmail.com', 
+    'josueamorim906@gmail.com', 
+    'ruanvictordacostademedeiros@gmail.com', 
+    'mvitor8585@gmail.com', 
+    'karolgoncallo@gmail.com', 
+    'cabrallohan74@gmail.com',
+    'josueufceconomia@gmail.com'
+  ];
   const isAdminUser = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
+  const sqlEmailList = ADMIN_EMAILS.map(e => `'${e}'`).join(', ');
 
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [profileSearch, setProfileSearch] = useState('');
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [showRlsModal, setShowRlsModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   useEffect(() => {
     fetchProfile().catch(err => console.error('Profile: Error in fetchProfile:', err));
@@ -138,7 +149,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         // Apply same status normalization as the backend server (Admins always show up as PRO)
         data = (supabaseProfiles || []).map((usr: any) => {
           const emailLower = (usr.email || '').toLowerCase();
-          const isAdmin = ADMIN_EMAILS.includes(emailLower) || emailLower.includes('josueamorim906') || emailLower.includes('caiogabriel1995');
+          const isAdmin = ADMIN_EMAILS.includes(emailLower);
           const isPremiumOrPro = usr.is_premium === true || usr.is_pro === true || isAdmin;
 
           return {
@@ -212,16 +223,26 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         }
 
         if (!updatedSuccessfully) {
-          const { error: dbError } = await supabase
+          const { data, error: dbError } = await supabase
             .from('profiles')
             .update({
               is_premium: nextStatus,
               is_pro: nextStatus,
               updated_at: new Date().toISOString()
             })
-            .eq('id', targetUserId);
+            .eq('id', targetUserId)
+            .select();
 
           if (dbError) throw dbError;
+
+          if (!data || data.length === 0) {
+            setShowRlsModal(true);
+            throw new Error(
+              'A atualização no banco de dados foi barrada por restrição de segurança (RLS). ' +
+              'Como o Vercel é um site estático e não roda nosso backend nativo em Node para contornar o RLS, ' +
+              'você precisa rodar a função segura RPC admin_toggle_premium no console do Supabase para que as atualizações funcionem diretamente.'
+            );
+          }
           updatedSuccessfully = true;
         }
       }
@@ -231,7 +252,17 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         setAllProfiles(prev => prev.map(p => p.id === targetUserId ? { ...p, is_premium: nextStatus, is_pro: nextStatus } : p));
       }
     } catch (err: any) {
-      alert('Erro ao atualizar status do usuário: ' + err.message);
+      console.error('Error toggling premium:', err);
+      if (err.message && (err.message.includes('RLS') || err.message.includes('admin_toggle_premium') || err.message.includes('barrada por restrição') || err.message.includes('permissão') || err.message.includes('denied'))) {
+        setShowRlsModal(true);
+        alert(
+          'Atenção: A atualização no banco de dados falhou devido a restrições de segurança RLS do Supabase.\n\n' +
+          'Se você está acessando a partir de um ambiente estático (como o Vercel), você precisa instalar as funções RPC seguras no console do Supabase para que a atualização direta funcione.\n\n' +
+          'Abriremos o painel com o código SQL e instruções na tela para você copiar.'
+        );
+      } else {
+        alert('Erro ao atualizar status do usuário: ' + err.message);
+      }
     } finally {
       setUpdatingUserId(null);
     }
@@ -918,7 +949,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
               <div className="space-y-2">
                 <h3 className="text-lg font-bold text-white">Sair da Conta</h3>
                 <p className="text-sm text-muted">
-                  {user.id === 'guest_user'
+                   {user.id === 'guest_user'
                     ? 'Deseja realmente sair do modo visitante? Seus dados continuarão salvos localmente.'
                     : 'Tem certeza de que deseja sair de sua conta?'}
                 </p>
@@ -938,6 +969,159 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
                 >
                   Sair
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showRlsModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRlsModal(false)}
+              className="fixed inset-0 bg-background/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-[#141517] border border-white/5 p-6 md:p-8 rounded-[32px] shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white shrink-0">Configuração de Permissão do Supabase</h3>
+                  <p className="text-xs text-muted">Ative o bypass seguro de RLS para o painel de administradores no Vercel.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 text-left leading-relaxed text-slate-300 text-sm">
+                <p>
+                  Como o <strong>Vercel é um serviço de hospedagem estático</strong>, os recursos de API do nosso backend em Node.js (que usam a chave mestre para modificar usuários bypassando RLS) não funcionam.
+                </p>
+                <p>
+                  Para resolver isso com total segurança, você só precisa criar duas pequenas funções (RPC) com privilégio de administrador executado via <code>SECURITY DEFINER</code>. Ambas estão programadas para só permitirem execução se o usuário logado for de fato um administrador (<code>{ADMIN_EMAILS.join(' ou ')}</code>).
+                </p>
+                
+                <div className="space-y-2">
+                  <span className="text-xs text-primary uppercase font-bold tracking-widest block">Instruções de Instalação rápida:</span>
+                  <ol className="list-decimal pl-5 space-y-2 text-xs text-muted">
+                    <li>Acesse o console do seu projeto no <strong>Supabase</strong> (supabase.com).</li>
+                    <li>No menu esquerdo, vá em <strong>SQL Editor</strong> e crie uma nova query (clique em <code>New query</code>).</li>
+                    <li>Cole o código SQL fornecido abaixo e clique em <strong>Run</strong>.</li>
+                    <li>Pronto! O painel de controle e a troca de status do PRO passarão a funcionar imediatamente.</li>
+                  </ol>
+                </div>
+
+                <div className="relative bg-[#0d0e10] p-4 rounded-2xl border border-white/5 font-mono text-xs overflow-x-auto max-h-60 mt-3 select-all">
+                  <pre className="text-emerald-400">
+{`CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
+RETURNS JSONB
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_email TEXT;
+BEGIN
+  current_user_email := (auth.jwt() ->> 'email')::text;
+
+  IF current_user_email IN (${sqlEmailList}) THEN
+    UPDATE public.profiles
+    SET is_premium = next_status, is_pro = next_status, updated_at = NOW()
+    WHERE id = target_user_id;
+    RETURN jsonb_build_object('success', true);
+  ELSE
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied');
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.admin_get_users()
+RETURNS SETOF public.profiles
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_email TEXT;
+BEGIN
+  current_user_email := (auth.jwt() ->> 'email')::text;
+
+  IF current_user_email IN (${sqlEmailList}) THEN
+    RETURN QUERY SELECT * FROM public.profiles;
+  ELSE
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+END;
+$$ LANGUAGE plpgsql;`}
+                  </pre>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sql = `CREATE OR REPLACE FUNCTION public.admin_toggle_premium(target_user_id UUID, next_status BOOLEAN)
+RETURNS JSONB
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_email TEXT;
+BEGIN
+  current_user_email := (auth.jwt() ->> 'email')::text;
+
+  IF current_user_email IN (${sqlEmailList}) THEN
+    UPDATE public.profiles
+    SET is_premium = next_status, is_pro = next_status, updated_at = NOW()
+    WHERE id = target_user_id;
+    RETURN jsonb_build_object('success', true);
+  ELSE
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied');
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.admin_get_users()
+RETURNS SETOF public.profiles
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_email TEXT;
+BEGIN
+  current_user_email := (auth.jwt() ->> 'email')::text;
+
+  IF current_user_email IN (${sqlEmailList}) THEN
+    RETURN QUERY SELECT * FROM public.profiles;
+  ELSE
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+END;
+$$ LANGUAGE plpgsql;`;
+                      navigator.clipboard.writeText(sql);
+                      setCopiedSql(true);
+                      setTimeout(() => setCopiedSql(false), 2000);
+                    }}
+                    className="flex-1 bg-primary text-background font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-all active:scale-95 text-xs"
+                  >
+                    {copiedSql ? (
+                      <><CheckCircle2 className="w-4 h-4" /> Copiado com sucesso!</>
+                    ) : (
+                      <><Copy className="w-4 h-4" /> Copiar Código SQL</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRlsModal(false)}
+                    className="flex-1 bg-white/5 text-white hover:bg-white/10 font-bold py-3.5 px-4 rounded-xl transition-all active:scale-95 text-xs"
+                  >
+                    Fechar Instruções
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

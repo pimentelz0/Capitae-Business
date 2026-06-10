@@ -117,7 +117,15 @@ async function startServer() {
   // Get all registered users bypasses client-side RLS via service client
   app.get("/api/admin/users", async (req, res) => {
     const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
-    const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+    const ADMIN_EMAILS = [
+      'caiogabriel1995@gmail.com', 
+      'josueamorim906@gmail.com', 
+      'ruanvictordacostademedeiros@gmail.com', 
+      'mvitor8585@gmail.com', 
+      'karolgoncallo@gmail.com', 
+      'cabrallohan74@gmail.com',
+      'josueufceconomia@gmail.com'
+    ];
     
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
       console.warn(`Admin access denied for email: ${adminEmail}`);
@@ -139,7 +147,7 @@ async function startServer() {
       // Normalize statuses so admins always appear as PRO
       const normalized = (data || []).map((usr: any) => {
         const emailLower = (usr.email || '').toLowerCase();
-        const isAdmin = ADMIN_EMAILS.includes(emailLower) || emailLower.includes('josueamorim906') || emailLower.includes('caiogabriel1995');
+        const isAdmin = ADMIN_EMAILS.includes(emailLower);
         const isPremiumOrPro = usr.is_premium === true || usr.is_pro === true || isAdmin;
 
         return {
@@ -159,7 +167,15 @@ async function startServer() {
   // Toggle user premium status
   app.post("/api/admin/users/toggle-premium", async (req, res) => {
     const adminEmail = (req.headers['x-admin-email'] as string || '').toLowerCase();
-    const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+    const ADMIN_EMAILS = [
+      'caiogabriel1995@gmail.com', 
+      'josueamorim906@gmail.com', 
+      'ruanvictordacostademedeiros@gmail.com', 
+      'mvitor8585@gmail.com', 
+      'karolgoncallo@gmail.com', 
+      'cabrallohan74@gmail.com',
+      'josueufceconomia@gmail.com'
+    ];
 
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
       return res.status(403).json({ error: "Acesso negado." });
@@ -188,15 +204,23 @@ async function startServer() {
 
       const nextStatus = !currentStatus;
 
-      const { error } = await client
+      const { data, error } = await client
         .from('profiles')
         .update({
           is_premium: nextStatus,
           is_pro: nextStatus
         })
-        .eq('id', targetUserId);
+        .eq('id', targetUserId)
+        .select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error(
+          "A atualização foi barrada por restrições de nível de linha (RLS) no banco de dados. " +
+          "Certifique-se de configurar a chave SUPABASE_SERVICE_ROLE_KEY no contêiner ou criar as funções RPC indicadas no painel."
+        );
+      }
 
       return res.json({ success: true, newStatus: nextStatus });
     } catch (err: any) {

@@ -95,7 +95,15 @@ export default function Dashboard({ user }: DashboardProps) {
   const [loading, setLoading] = useState(true);
 
   // Subscription and 7-day Trial state
-  const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+  const ADMIN_EMAILS = [
+    'caiogabriel1995@gmail.com', 
+    'josueamorim906@gmail.com', 
+    'ruanvictordacostademedeiros@gmail.com', 
+    'mvitor8585@gmail.com', 
+    'karolgoncallo@gmail.com', 
+    'cabrallohan74@gmail.com',
+    'josueufceconomia@gmail.com'
+  ];
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
 
   const [isPremium, setIsPremium] = useState<boolean>(() => {
@@ -353,7 +361,15 @@ export default function Dashboard({ user }: DashboardProps) {
           .single();
 
         const userEmailLower = user.email ? user.email.toLowerCase() : '';
-        const ADMIN_EMAILS = ['caiogabriel1995@gmail.com', 'josueamorim906@gmail.com'];
+        const ADMIN_EMAILS = [
+          'caiogabriel1995@gmail.com', 
+          'josueamorim906@gmail.com', 
+          'ruanvictordacostademedeiros@gmail.com', 
+          'mvitor8585@gmail.com', 
+          'karolgoncallo@gmail.com', 
+          'cabrallohan74@gmail.com',
+          'josueufceconomia@gmail.com'
+        ];
         const isUserAdmin = ADMIN_EMAILS.includes(userEmailLower);
 
         if (dbProfile) {

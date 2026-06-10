@@ -101,8 +101,7 @@ export default function Dashboard({ user }: DashboardProps) {
     'ruanvictordacostademedeiros@gmail.com', 
     'mvitor8585@gmail.com', 
     'karolgoncallo@gmail.com', 
-    'cabrallohan74@gmail.com',
-    'josueufceconomia@gmail.com'
+    'cabrallohan74@gmail.com'
   ];
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
 
@@ -367,8 +366,7 @@ export default function Dashboard({ user }: DashboardProps) {
           'ruanvictordacostademedeiros@gmail.com', 
           'mvitor8585@gmail.com', 
           'karolgoncallo@gmail.com', 
-          'cabrallohan74@gmail.com',
-          'josueufceconomia@gmail.com'
+          'cabrallohan74@gmail.com'
         ];
         const isUserAdmin = ADMIN_EMAILS.includes(userEmailLower);
 

@@ -123,8 +123,7 @@ async function startServer() {
       'ruanvictordacostademedeiros@gmail.com', 
       'mvitor8585@gmail.com', 
       'karolgoncallo@gmail.com', 
-      'cabrallohan74@gmail.com',
-      'josueufceconomia@gmail.com'
+      'cabrallohan74@gmail.com'
     ];
     
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {
@@ -173,8 +172,7 @@ async function startServer() {
       'ruanvictordacostademedeiros@gmail.com', 
       'mvitor8585@gmail.com', 
       'karolgoncallo@gmail.com', 
-      'cabrallohan74@gmail.com',
-      'josueufceconomia@gmail.com'
+      'cabrallohan74@gmail.com'
     ];
 
     if (!adminEmail || !ADMIN_EMAILS.includes(adminEmail)) {

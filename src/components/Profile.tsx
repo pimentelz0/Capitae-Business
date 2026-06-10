@@ -68,8 +68,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
     'ruanvictordacostademedeiros@gmail.com', 
     'mvitor8585@gmail.com', 
     'karolgoncallo@gmail.com', 
-    'cabrallohan74@gmail.com',
-    'josueufceconomia@gmail.com'
+    'cabrallohan74@gmail.com'
   ];
   const isAdminUser = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
   const sqlEmailList = ADMIN_EMAILS.map(e => `'${e}'`).join(', ');

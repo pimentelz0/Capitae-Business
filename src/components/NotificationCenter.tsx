@@ -208,12 +208,12 @@ export default function NotificationCenter({ userId, theme = 'light', onRedirect
       {/* Bell Icon Button */}
       <button 
         onClick={handleToggleOpen}
-        className="p-2 hover:bg-foreground/5 rounded-xl transition-colors relative text-muted hover:text-foreground group"
+        className="p-1.5 hover:bg-foreground/5 rounded-xl transition-colors relative text-muted hover:text-foreground group"
         title="Notificações"
       >
-        <Bell className="w-5 h-5 group-hover:scale-105 transition-transform" />
+        <Bell className="w-4 h-4 group-hover:scale-105 transition-transform" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary text-background text-[10px] font-black rounded-full flex items-center justify-center animate-bounce shadow-md">
+          <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-primary text-background text-[9px] font-black rounded-full flex items-center justify-center animate-bounce shadow-md">
             {unreadCount}
           </span>
         )}

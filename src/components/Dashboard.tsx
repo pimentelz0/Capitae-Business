@@ -748,11 +748,11 @@ export default function Dashboard({ user }: DashboardProps) {
           <div className="flex items-center">
             <button 
               onClick={() => setIsMenuOpen(true)}
-              className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted"
+              className="flex items-center gap-1.5 px-2 py-1 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted"
               title="Abrir Menu / Perfil"
             >
-              <Menu className="w-4.5 h-4.5" />
-              <div className="w-5.5 h-5.5 bg-secondary rounded-full overflow-hidden border border-foreground/10 flex items-center justify-center">
+              <Menu className="w-3.5 h-3.5" />
+              <div className="w-5.5 h-5.5 bg-secondary rounded-full overflow-hidden border border-foreground/10 flex items-center justify-center shrink-0">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Perfil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -764,7 +764,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
           {/* Center part: Centered Title and Subtitle */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-            <h2 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white dark:text-white font-sans whitespace-nowrap drop-shadow-[0_0_12px_rgba(0,200,83,0.1)]">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white dark:text-white font-sans whitespace-nowrap drop-shadow-[0_0_12px_rgba(0,200,83,0.1)]">
               Capitae Business
             </h2>
             <p className="text-[7.5px] sm:text-[8.5px] text-primary font-black uppercase tracking-[0.16em] mt-0.5 whitespace-nowrap">
@@ -773,13 +773,13 @@ export default function Dashboard({ user }: DashboardProps) {
           </div>
 
           {/* Right part: Theme toggle + Notification Center */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 hover:bg-foreground/5 rounded-xl transition-colors text-muted"
+              className="p-1.5 hover:bg-foreground/5 rounded-xl transition-colors text-muted"
               title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
             >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             
             <NotificationCenter 

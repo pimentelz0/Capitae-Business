@@ -918,7 +918,7 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
           <Info className="w-4 h-4" /> Dica de Segurança
         </h4>
         <p className="text-xs text-muted leading-relaxed">
-          Suas informações de perfil são privadas e usadas apenas para personalizar sua experiência no Capitae e ajudar o Capy a te dar conselhos melhores.
+          Suas informações de perfil são privadas e usadas apenas para personalizar sua experiência no Capitae.
         </p>
       </div>
 

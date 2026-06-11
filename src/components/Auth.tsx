@@ -233,6 +233,33 @@ export default function Auth() {
           </button>
         </form>
 
+        {!isForgotPassword && (
+          <div className="space-y-4">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/5" />
+              </div>
+              <span className="relative px-3 bg-[#09090B] text-zinc-500 text-[11px] font-bold uppercase tracking-widest">
+                Ou continue com
+              </span>
+            </div>
+
+            <button
+              type="button"
+              disabled={googleLoading || loading}
+              onClick={handleGoogleLogin}
+              className="w-full py-3 bg-zinc-900 hover:bg-zinc-850 border border-white/10 hover:border-white/20 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
+            >
+              {googleLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              ) : (
+                <Chrome className="w-5 h-5 text-emerald-400" />
+              )}
+              <span>Entrar com o Google</span>
+            </button>
+          </div>
+        )}
+
         {isForgotPassword ? (
           <div className="text-center pt-2">
             <button

@@ -989,8 +989,8 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
                   <Shield className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white shrink-0">Configuração de Permissão do Supabase</h3>
-                  <p className="text-xs text-muted">Ative o bypass seguro de RLS para o painel de administradores no Vercel.</p>
+                  <h3 className="text-lg font-black text-white shrink-0">Instalação Simples via SQL Editor</h3>
+                  <p className="text-xs text-muted">Basta rodar o código abaixo no SQL Editor do seu console Supabase.</p>
                 </div>
               </div>
 

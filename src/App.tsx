@@ -376,7 +376,7 @@ export default function App() {
         />
 
         {/* Content Container */}
-        <div className="relative z-10 flex flex-col items-center max-w-sm">
+        <div className="relative z-10 flex flex-col items-center max-w-md w-full px-4">
           {/* Logo */}
           <motion.img
             initial={{ opacity: 0, scale: 0.8 }}
@@ -393,7 +393,7 @@ export default function App() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 120, damping: 15, delay: 0.15 }}
-            className="text-5xl font-black tracking-tighter text-white select-none pointer-events-none mb-2 font-sans"
+            className="text-3xl sm:text-4xl font-black tracking-tighter text-white select-none pointer-events-none mb-2 font-sans whitespace-nowrap"
           >
             Capitae Business
           </motion.h1>
@@ -402,9 +402,9 @@ export default function App() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-zinc-400 text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-95"
+            className="text-zinc-400 text-[10px] sm:text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-95 whitespace-nowrap"
           >
-            Gestão inteligente para pequenas empresas e autônomos
+            Gestão inteligente de negócios
           </motion.p>
 
           {/* Horizontal tracking progress line */}

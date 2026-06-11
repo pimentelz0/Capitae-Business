@@ -365,24 +365,35 @@ export default function App() {
           filter: "blur(10px)"
         }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed inset-0 z-50 min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden animate-fadeIn"
+        className="fixed inset-0 z-50 min-h-screen bg-[#09090B] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden animate-fadeIn"
       >
         {/* Animated Background Pulse */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
-          className="absolute w-80 h-80 bg-[#00C853]/15 rounded-full blur-[100px] pointer-events-none"
+          className="absolute w-96 h-96 bg-[#00C853]/10 rounded-full blur-[120px] pointer-events-none"
         />
 
         {/* Content Container */}
         <div className="relative z-10 flex flex-col items-center max-w-sm">
+          {/* Logo */}
+          <motion.img
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 100, damping: 12, delay: 0.05 }}
+            src="/icon.png"
+            alt="Logo"
+            className="w-20 h-20 rounded-2xl shadow-2xl shadow-emerald-500/10 border border-white/10 mb-6 select-none pointer-events-none object-cover"
+            referrerPolicy="no-referrer"
+          />
+
           {/* App Title */}
           <motion.h1
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 120, damping: 15, delay: 0.1 }}
-            className="text-5xl font-black tracking-tighter text-slate-950 select-none pointer-events-none mb-2 font-sans"
+            transition={{ type: "spring", stiffness: 120, damping: 15, delay: 0.15 }}
+            className="text-5xl font-black tracking-tighter text-white select-none pointer-events-none mb-2 font-sans"
           >
             Capitae Business
           </motion.h1>
@@ -390,14 +401,14 @@ export default function App() {
           <motion.p
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-slate-500 text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-90"
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="text-zinc-400 text-xs font-semibold tracking-wider uppercase select-none pointer-events-none opacity-95"
           >
             Gestão inteligente para pequenas empresas e autônomos
           </motion.p>
 
           {/* Horizontal tracking progress line */}
-          <div className="w-48 h-1 bg-slate-200 rounded-full overflow-hidden mt-8 relative">
+          <div className="w-48 h-1 bg-zinc-800 rounded-full overflow-hidden mt-8 relative">
             <motion.div 
               initial={{ x: "-100%" }}
               animate={loading ? { x: ["-100%", "200%"] } : { x: "100%" }}
@@ -417,7 +428,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.8 }}
             transition={{ duration: 0.4, delay: 0.7 }}
-            className="text-[11px] text-slate-600 font-bold mt-3"
+            className="text-[11px] text-zinc-500 font-bold mt-3"
           >
             {loading ? "Sincronizando dados..." : "Iniciando..."}
           </motion.p>
@@ -437,7 +448,7 @@ export default function App() {
                     setLoading(false);
                     setSplashTimeoutFinished(true);
                   }}
-                  className="px-5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all hover:scale-102 shadow-sm"
+                  className="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-850 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-250 transition-all hover:scale-102 shadow-sm"
                 >
                   Pular Carregamento
                 </button>
@@ -487,7 +498,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.15 }}
-            className={`min-h-screen ${(!user && localStorage.getItem('capitae_is_guest') !== 'true') ? 'bg-background text-foreground light' : 'bg-background text-foreground'}`}
+            className="min-h-screen bg-background text-foreground"
           >
             {user || localStorage.getItem('capitae_is_guest') === 'true' ? (
               <Dashboard key="dashboard-view" user={user || mockUser} />

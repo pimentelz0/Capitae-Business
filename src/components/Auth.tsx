@@ -115,7 +115,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground light">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#09090B] text-zinc-100 dark">
       <motion.div 
         key={isForgotPassword ? 'forgot-form' : (isSignUp ? 'signup-form' : 'signin-form')}
         initial={{ opacity: 0, y: 20 }}
@@ -123,8 +123,17 @@ export default function Auth() {
         className="w-full max-w-md space-y-8"
       >
         <div className="text-center">
+          <motion.img
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 100, damping: 12 }}
+            src="/icon.png"
+            alt="Logo"
+            className="w-20 h-20 rounded-2xl shadow-2xl shadow-emerald-500/10 border border-white/10 mx-auto mb-6 object-cover select-none pointer-events-none"
+            referrerPolicy="no-referrer"
+          />
           <h1 className="text-4xl font-bold tracking-tighter text-primary">Capitae Business</h1>
-          <p className="mt-2 text-muted font-medium">
+          <p className="mt-2 text-zinc-400 font-medium">
             <span>
               {isForgotPassword 
                 ? 'Recupere sua senha com facilidade' 
@@ -158,13 +167,13 @@ export default function Auth() {
           )}
           
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted"><span>Email</span></label>
+            <label className="text-sm font-medium text-zinc-300"><span>Email</span></label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-secondary border border-white/5 rounded-xl focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-zinc-900 border border-white/10 rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-white placeholder-zinc-500 transition-all"
               placeholder="seu@email.com"
             />
           </div>
@@ -172,7 +181,7 @@ export default function Auth() {
           {!isForgotPassword && (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-muted"><span>Senha</span></label>
+                <label className="text-sm font-medium text-zinc-300"><span>Senha</span></label>
                 {!isSignUp && (
                   <button
                     type="button"
@@ -181,7 +190,7 @@ export default function Auth() {
                       setSuccess(null);
                       setIsForgotPassword(true);
                     }}
-                    className="text-xs text-muted hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                    className="text-xs text-zinc-400 hover:text-primary transition-colors focus:outline-none cursor-pointer"
                   >
                     Esqueceu a senha?
                   </button>
@@ -192,7 +201,7 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-secondary border border-white/5 rounded-xl focus:outline-none focus:border-primary transition-colors"
+                className="w-full px-4 py-3 bg-zinc-900 border border-white/10 rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-white placeholder-zinc-500 transition-all"
                 placeholder="••••••••"
               />
             </div>
@@ -201,7 +210,7 @@ export default function Auth() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-background font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            className="w-full py-3 bg-primary text-zinc-950 font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/5 active:scale-[0.98] transition-transform"
           >
             {loading ? (
               <Loader2 key="loader-icon" className="w-5 h-5 animate-spin" />
@@ -232,7 +241,7 @@ export default function Auth() {
                 setSuccess(null);
                 setIsForgotPassword(false);
               }}
-              className="text-sm text-muted hover:text-primary transition-colors flex items-center justify-center gap-2 mx-auto"
+              className="text-sm text-zinc-400 hover:text-primary transition-colors flex items-center justify-center gap-2 mx-auto"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Voltar para o Login</span>
@@ -247,7 +256,7 @@ export default function Auth() {
                   setSuccess(null);
                   setIsSignUp(!isSignUp);
                 }}
-                className="text-xs text-muted hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                className="text-xs text-zinc-400 hover:text-primary transition-colors focus:outline-none cursor-pointer"
               >
                 {isSignUp ? (
                   <span key="goto-login">Já tem uma conta? Entre</span>

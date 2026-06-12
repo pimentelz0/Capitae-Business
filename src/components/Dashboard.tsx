@@ -22,7 +22,8 @@ import {
   Package,
   Clock,
   Check,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
 
 // Domain imports
@@ -77,6 +78,71 @@ interface DashboardProps {
 
 export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile'>('pdv');
+  
+  // Tab Navigation History & Swiping-to-Back controls (iOS slide-from-left feeling)
+  const [tabHistory, setTabHistory] = useState<('pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile')[]>(['pdv']);
+  const isNavigatingBackRef = React.useRef(false);
+
+  const goBackTab = () => {
+    if (tabHistory.length > 1) {
+      isNavigatingBackRef.current = true;
+      const newHistory = [...tabHistory];
+      newHistory.pop(); // remove current active tab
+      const prevTab = newHistory[newHistory.length - 1];
+      setTabHistory(newHistory);
+      setActiveTab(prevTab);
+    } else {
+      setActiveTab('pdv');
+      setTabHistory(['pdv']);
+    }
+  };
+
+  useEffect(() => {
+    if (isNavigatingBackRef.current) {
+      isNavigatingBackRef.current = false;
+      return;
+    }
+    setTabHistory(prev => {
+      if (prev[prev.length - 1] === activeTab) return prev;
+      return [...prev, activeTab];
+    });
+  }, [activeTab]);
+
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length === 1) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        const diffX = touchEndX - touchStartX;
+        const diffY = Math.abs(touchEndY - touchStartY);
+
+        // Activates when starting within 45px of the left edge and swiping right
+        if (touchStartX < 45 && diffX > 60 && diffY < 40) {
+          goBackTab();
+        }
+      }
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [tabHistory, activeTab]);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem(`capitae_business_theme_${user.id}`) as 'dark' | 'light') || 'dark';
@@ -745,7 +811,16 @@ export default function Dashboard({ user }: DashboardProps) {
         <div className="max-w-7xl mx-auto flex items-center justify-between relative">
           
           {/* Left part: Menu (3 lines) button unified with Profile icon */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {(tabHistory.length > 1 || activeTab !== 'pdv') && (
+              <button
+                onClick={goBackTab}
+                className="flex items-center justify-center p-1.5 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted hover:text-white active:scale-95 cursor-pointer"
+                title="Voltar"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button 
               onClick={() => setIsMenuOpen(true)}
               className="flex items-center gap-1.5 px-2 py-1 hover:bg-foreground/5 rounded-full border border-foreground/10 transition-all text-muted"

@@ -79,83 +79,119 @@ interface DashboardProps {
 export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile'>('pdv');
   
-  // Pull-to-refresh state for iOS fullscreen standalone PWA
+  // Pull-to-refresh state for mobile standalone PWA
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const pullDistanceRef = React.useRef(0);
+  const isRefreshingRef = React.useRef(false);
+
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance;
+  }, [pullDistance]);
+
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing;
+  }, [isRefreshing]);
+
   useEffect(() => {
     let startY = 0;
+    let startX = 0;
     let isTracking = false;
+    let animationFrameId: number | null = null;
 
     const handleTouchStartPull = (e: TouchEvent) => {
-      if (e.touches.length === 1 && window.scrollY <= 1 && !isRefreshing) {
-        let target = e.target as HTMLElement;
-        let isInsideScrollable = false;
-        while (target && target !== document.body) {
-          const style = window.getComputedStyle(target);
-          if (
-            (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
-            target.scrollTop > 0
-          ) {
-            isInsideScrollable = true;
-            break;
-          }
-          target = target.parentElement as HTMLElement;
-        }
+      if (e.touches.length !== 1) return;
+      
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      if (scrollTop > 1 || isRefreshingRef.current) return;
 
-        if (!isInsideScrollable) {
-          startY = e.touches[0].clientY;
-          isTracking = true;
+      let target = e.target as HTMLElement;
+      let isInsideScrollable = false;
+      while (target && target !== document.body) {
+        const style = window.getComputedStyle(target);
+        if (
+          (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+          target.scrollTop > 0
+        ) {
+          isInsideScrollable = true;
+          break;
         }
+        target = target.parentElement as HTMLElement;
+      }
+
+      if (!isInsideScrollable) {
+        startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
+        isTracking = true;
       }
     };
 
     const handleTouchMovePull = (e: TouchEvent) => {
-      if (!isTracking || isRefreshing) return;
+      if (!isTracking || isRefreshingRef.current) return;
 
       const currentY = e.touches[0].clientY;
+      const currentX = e.touches[0].clientX;
       const diffY = currentY - startY;
+      const diffX = Math.abs(currentX - startX);
 
-      if (diffY > 0 && window.scrollY <= 1) {
-        const distance = Math.min(100, diffY * 0.45);
-        setPullDistance(distance);
+      // Verify vertical movement is primary
+      if (diffY > 0 && diffY > diffX && (window.scrollY || document.documentElement.scrollTop) <= 1) {
+        // Logarithmic/Dampened elastic spring progression
+        const distance = Math.min(80, Math.pow(diffY, 0.78) * 1.6);
+        
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        
+        animationFrameId = requestAnimationFrame(() => {
+          setPullDistance(distance);
+        });
 
-        // Cancel default webview overscroll so custom animation transitions cleanly
-        if (distance > 5 && e.cancelable) {
+        if (distance > 3 && e.cancelable) {
           e.preventDefault();
         }
-      } else {
-        setPullDistance(0);
+      } else if (diffY < 0) {
+        if (pullDistanceRef.current > 0) {
+          if (animationFrameId) cancelAnimationFrame(animationFrameId);
+          setPullDistance(0);
+        }
         isTracking = false;
       }
     };
 
     const handleTouchEndPull = () => {
-      if (!isTracking || isRefreshing) return;
+      if (!isTracking || isRefreshingRef.current) return;
       isTracking = false;
 
-      if (pullDistance >= 65) {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      const currentDistance = pullDistanceRef.current;
+      if (currentDistance >= 60) {
         setIsRefreshing(true);
-        setPullDistance(65);
+        setPullDistance(60);
 
         setTimeout(() => {
           window.location.reload();
-        }, 800);
+        }, 850);
       } else {
         setPullDistance(0);
       }
     };
 
-    window.addEventListener('touchstart', handleTouchStartPull, { passive: false });
+    window.addEventListener('touchstart', handleTouchStartPull, { passive: true });
     window.addEventListener('touchmove', handleTouchMovePull, { passive: false });
     window.addEventListener('touchend', handleTouchEndPull, { passive: true });
 
     return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       window.removeEventListener('touchstart', handleTouchStartPull);
       window.removeEventListener('touchmove', handleTouchMovePull);
       window.removeEventListener('touchend', handleTouchEndPull);
     };
-  }, [pullDistance, isRefreshing]);
+  }, []);
 
   // Tab Navigation History & Swiping-to-Back controls (iOS slide-from-left feeling)
   const [tabHistory, setTabHistory] = useState<('pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile')[]>(['pdv']);

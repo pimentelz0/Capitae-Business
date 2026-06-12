@@ -1143,14 +1143,6 @@ export default function Dashboard({ user }: DashboardProps) {
         )}
       </AnimatePresence>
 
-      {/* Re-aligned Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-foreground/5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex justify-around items-center z-50">
-        <NavButton active={activeTab === 'pdv'} onClick={() => setActiveTab('pdv')} icon={<ShoppingCart />} label="Caixa" />
-        <NavButton active={activeTab === 'financeiro'} onClick={() => setActiveTab('financeiro')} icon={<TrendingUp />} label="Financeiro" />
-        <NavButton active={activeTab === 'estoque'} onClick={() => setActiveTab('estoque')} icon={<Package />} label="Estoque" />
-        <NavButton active={activeTab === 'relatorios'} onClick={() => setActiveTab('relatorios')} icon={<BarChart3 />} label="Relatórios" />
-        <NavButton active={activeTab === 'precificacao'} onClick={() => setActiveTab('precificacao')} icon={<Calculator />} label="Precificar" />
-      </nav>
 
       {/* Core overlay Modals */}
       <OnboardingModal 
@@ -1465,6 +1457,15 @@ export default function Dashboard({ user }: DashboardProps) {
         </div>
       )}
     </div>
+
+    {/* Fixed Bottom Navigation Bar (placed outside translated container) */}
+    <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-foreground/5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex justify-around items-center z-50">
+      <NavButton active={activeTab === 'pdv'} onClick={() => setActiveTab('pdv')} icon={<ShoppingCart />} label="Caixa" />
+      <NavButton active={activeTab === 'financeiro'} onClick={() => setActiveTab('financeiro')} icon={<TrendingUp />} label="Financeiro" />
+      <NavButton active={activeTab === 'estoque'} onClick={() => setActiveTab('estoque')} icon={<Package />} label="Estoque" />
+      <NavButton active={activeTab === 'relatorios'} onClick={() => setActiveTab('relatorios')} icon={<BarChart3 />} label="Relatórios" />
+      <NavButton active={activeTab === 'precificacao'} onClick={() => setActiveTab('precificacao')} icon={<Calculator />} label="Precificar" />
+    </nav>
     </>
   );
 }

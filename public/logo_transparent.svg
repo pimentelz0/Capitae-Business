@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="120 100 270 310" width="270" height="310">
+  <defs>
+    <!-- Sophisticated dark-green gradient -->
+    <linearGradient id="cbGradTrans" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#006B4A" />
+      <stop offset="50%" stop-color="#008F5A" />
+      <stop offset="100%" stop-color="#00A86B" />
+    </linearGradient>
+
+    <!-- Mask to carve out the bar chart and the business growth line using negative space -->
+    <mask id="chartMaskTrans">
+      <!-- Everything white remains visible -->
+      <rect x="0" y="0" width="512" height="512" fill="#FFFFFF" />
+      
+      <!-- Black shapes will carve out negative space -->
+      <!-- Three ascending bars of the chart -->
+      <rect x="285" y="310" width="12" height="90" rx="3" fill="#000000" />
+      <rect x="307" y="290" width="12" height="110" rx="3" fill="#000000" />
+      <rect x="329" y="270" width="12" height="130" rx="3" fill="#000000" />
+      
+      <!-- Diagonal upward growth arrow connecting the bars -->
+      <path d="M 270 335 L 355 250 M 355 250 L 341 250 M 355 250 L 355 264" 
+            stroke="#000000" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    </mask>
+  </defs>
+
+  <!-- Monogram symbol connecting 'C' and 'B' with sophisticated gradient and negative-space mask -->
+  <path d="M 272 130 L 302 130 A 63 63 0 0 1 302 256 A 63 63 0 0 1 302 382 L 272 382 A 126 126 0 0 1 272 130 Z" 
+        fill="none" stroke="url(#cbGradTrans)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"
+        mask="url(#chartMaskTrans)" />
+</svg>

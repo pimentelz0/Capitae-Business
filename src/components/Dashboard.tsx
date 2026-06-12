@@ -79,6 +79,84 @@ interface DashboardProps {
 export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile'>('pdv');
   
+  // Pull-to-refresh state for iOS fullscreen standalone PWA
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    let startY = 0;
+    let isTracking = false;
+
+    const handleTouchStartPull = (e: TouchEvent) => {
+      if (e.touches.length === 1 && window.scrollY <= 1 && !isRefreshing) {
+        let target = e.target as HTMLElement;
+        let isInsideScrollable = false;
+        while (target && target !== document.body) {
+          const style = window.getComputedStyle(target);
+          if (
+            (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+            target.scrollTop > 0
+          ) {
+            isInsideScrollable = true;
+            break;
+          }
+          target = target.parentElement as HTMLElement;
+        }
+
+        if (!isInsideScrollable) {
+          startY = e.touches[0].clientY;
+          isTracking = true;
+        }
+      }
+    };
+
+    const handleTouchMovePull = (e: TouchEvent) => {
+      if (!isTracking || isRefreshing) return;
+
+      const currentY = e.touches[0].clientY;
+      const diffY = currentY - startY;
+
+      if (diffY > 0 && window.scrollY <= 1) {
+        const distance = Math.min(100, diffY * 0.45);
+        setPullDistance(distance);
+
+        // Cancel default webview overscroll so custom animation transitions cleanly
+        if (distance > 5 && e.cancelable) {
+          e.preventDefault();
+        }
+      } else {
+        setPullDistance(0);
+        isTracking = false;
+      }
+    };
+
+    const handleTouchEndPull = () => {
+      if (!isTracking || isRefreshing) return;
+      isTracking = false;
+
+      if (pullDistance >= 65) {
+        setIsRefreshing(true);
+        setPullDistance(65);
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+      } else {
+        setPullDistance(0);
+      }
+    };
+
+    window.addEventListener('touchstart', handleTouchStartPull, { passive: false });
+    window.addEventListener('touchmove', handleTouchMovePull, { passive: false });
+    window.addEventListener('touchend', handleTouchEndPull, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStartPull);
+      window.removeEventListener('touchmove', handleTouchMovePull);
+      window.removeEventListener('touchend', handleTouchEndPull);
+    };
+  }, [pullDistance, isRefreshing]);
+
   // Tab Navigation History & Swiping-to-Back controls (iOS slide-from-left feeling)
   const [tabHistory, setTabHistory] = useState<('pdv' | 'financeiro' | 'estoque' | 'relatorios' | 'precificacao' | 'profile')[]>(['pdv']);
   const isNavigatingBackRef = React.useRef(false);
@@ -805,7 +883,35 @@ export default function Dashboard({ user }: DashboardProps) {
   );
 
   return (
-    <div className={`min-h-screen bg-background text-foreground pb-24 ${theme === 'light' ? 'light' : ''}`}>
+    <>
+      {/* Pull down refresh indicator for custom iOS stand-alone fullscreen PWA */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div 
+          className="fixed left-0 right-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{
+            top: `calc(env(safe-area-inset-top, 0px) + 8px)`,
+            opacity: Math.min(1, pullDistance / 40),
+          }}
+        >
+          <div className="bg-zinc-900/95 dark:bg-zinc-900/95 border border-white/10 shadow-lg px-3.5 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-md">
+            <div 
+              className={`w-3.5 h-3.5 rounded-full border-2 border-[#00E676] border-t-transparent ${isRefreshing ? 'animate-spin' : ''}`}
+              style={!isRefreshing ? { transform: `rotate(${pullDistance * 6}deg)` } : {}}
+            />
+            <span className="text-[10px] font-bold tracking-tight text-white select-none">
+              {isRefreshing ? 'Atualizando...' : pullDistance >= 65 ? 'Solte para atualizar' : 'Deslize para atualizar'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div 
+        className={`min-h-screen bg-background text-foreground pb-24 ${theme === 'light' ? 'light' : ''}`}
+        style={{ 
+          transform: `translateY(${pullDistance}px)`,
+          transition: pullDistance === 0 ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+        }}
+      >
       {/* Header */}
       <header className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] border-b border-foreground/5 bg-background/50 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex items-center justify-between relative">
@@ -1323,6 +1429,7 @@ export default function Dashboard({ user }: DashboardProps) {
         </div>
       )}
     </div>
+    </>
   );
 }
 

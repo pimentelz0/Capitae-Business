@@ -95,11 +95,14 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
     }
     setSimulating(true);
     setSimResult(null);
+
+    const emailToSimulate = simulatedEmail.trim();
+
     try {
       const payload = {
         order_status: simulatedStatus,
         customer: {
-          email: simulatedEmail.trim(),
+          email: emailToSimulate,
           name: 'Simulador Cliente Capitae',
           mobile: '+5511999999999'
         },
@@ -109,40 +112,150 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         test: true
       };
 
-      const resp = await fetch('/api/webhooks/kiwify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-kiwify-signature': 'simulation'
-        },
-        body: JSON.stringify(payload)
-      });
+      let isStaticVercel = false;
+      let responseText = '';
+      let isOk = false;
+      let statusValue = 200;
 
-      const responseText = await resp.text();
-      
-      if (resp.ok) {
-        setSimResult({
-          success: true,
-          title: 'Simulação Enviada com Sucesso!',
-          msg: `A API de Webhook processou o sinal "${simulatedStatus}" em tempo real para:\n📧 ${simulatedEmail}\n\nResposta: ${responseText}\n\n👉 Caso tenha simulado para a sua própria conta, recarregue a página (ou clique em outra aba e volte) para ver a atualização PRO!`
+      try {
+        const resp = await fetch('/api/webhooks/kiwify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-kiwify-signature': 'simulation'
+          },
+          body: JSON.stringify(payload)
         });
+
+        responseText = await resp.text();
+        isOk = resp.ok;
+        statusValue = resp.status;
+
+        if (resp.status === 405 || resp.status === 404) {
+          isStaticVercel = true;
+        }
+      } catch (fetchErr) {
+        console.warn('Network error or server unavailable, switching to DB bypass:', fetchErr);
+        isStaticVercel = true;
+      }
+
+      // If we are on Vercel (static deployment) or server failed, run direct Supabase simulation!
+      if (isStaticVercel) {
+        console.log('Static hosting detected (e.g. Vercel 405/404). Initiating direct database simulator...');
         
-        // Trigger a profile refresh
-        setTimeout(() => {
-          fetchProfile().catch(err => console.error('Error reloading updated status:', err));
-        }, 1500);
-      } else {
-        setSimResult({
-          success: false,
-          title: `Falha na Simulação (${resp.status})`,
-          msg: `Servidor recusou a simulação: ${responseText}\n\nNota: Certifique-se de que o usuário com este e-mail já existe/está cadastrado no aplicativo antes de testar.`
+        // 1. Fetch user by email to get their ID and confirm they exist
+        const { data: targetProfile, error: fetchErr } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .ilike('email', emailToSimulate)
+          .maybeSingle();
+
+        if (fetchErr) {
+          setSimResult({
+            success: false,
+            title: 'Erro no Supabase',
+            msg: `Não foi possível consultar os perfis: ${fetchErr.message}`
+          });
+          return;
+        }
+
+        if (!targetProfile) {
+          setSimResult({
+            success: false,
+            title: 'Usuário não cadastrado',
+            msg: `Não encontramos nenhum perfil com o e-mail "${emailToSimulate}".\n\n👉 Certifique-se de que você já fez o login ou criou a conta no aplicativo com este e-mail antes de rodar o teste.`
+          });
+          return;
+        }
+
+        // 2. Insert/Upsert into kiwify_payments table so manual search works in dashboard too
+        const { error: payErr } = await supabase
+          .from('kiwify_payments')
+          .upsert({
+            email: emailToSimulate.toLowerCase(),
+            status: simulatedStatus,
+            updated_at: new Date().toISOString()
+          });
+
+        if (payErr) {
+          console.warn('Could not insert payment row in kiwify_payments table. If you have not created this table yet, run the SQL script below. We will still try to update profiles.', payErr);
+        }
+
+        // 3. Update the profile status
+        let updatedSuccessfully = false;
+        let updateMethodUsed = '';
+
+        // Try using RPC admin function if user is Admin and function is installed
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_toggle_premium', {
+          target_user_id: targetProfile.id,
+          next_status: simulatedStatus === 'paid'
         });
+
+        if (!rpcErr && rpcRes?.success) {
+          updatedSuccessfully = true;
+          updateMethodUsed = 'Função RPC Segura (admin_toggle_premium)';
+        } else {
+          // If RPC fails or not installed, try direct table write (which is allowed for self-records under user owner policy)
+          const { error: directErr } = await supabase
+            .from('profiles')
+            .update({
+              is_premium: simulatedStatus === 'paid',
+              is_pro: simulatedStatus === 'paid',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetProfile.id);
+
+          if (!directErr) {
+            updatedSuccessfully = true;
+            updateMethodUsed = 'Escrita Direta na Tabela "profiles"';
+          } else {
+            console.error('All DB update attempts failed:', { rpcErr, directErr });
+          }
+        }
+
+        if (updatedSuccessfully) {
+          setSimResult({
+            success: true,
+            title: 'Simulação Bypass Concluída! 🚀',
+            msg: `Detecção de Deploy Estático (Vercel/Static) resolvida!\nO sinal "${simulatedStatus}" foi inserido diretamente no banco de dados (${updateMethodUsed}) para:\n📧 ${emailToSimulate}\n\n👉 Recarregue a página (ou clique em outra aba e volte) para ver a atualização PRO ativa!`
+          });
+
+          // Trigger state updater
+          setTimeout(() => {
+            fetchProfile().catch(err => console.error('Error reloading updated status:', err));
+          }, 1500);
+        } else {
+          setSimResult({
+            success: false,
+            title: 'Permissão Supabase Negada',
+            msg: `Encontramos o usuário "${emailToSimulate}", mas a política de segurança RLS do seu Supabase impediu a atualização direta.\n\nPara liberar isso, clique no botão "Exibir Código SQL" no final deste painel, copie o script e execute-o no SQL Editor do seu console Supabase. Isso habilitará o bypass seguro!`
+          });
+        }
+      } else {
+        // Normal Express Backend API response
+        if (isOk) {
+          setSimResult({
+            success: true,
+            title: 'Simulação Enviada com Sucesso!',
+            msg: `A API de Webhook processou o sinal "${simulatedStatus}" em tempo real para:\n📧 ${emailToSimulate}\n\nResposta: ${responseText}\n\n👉 Recarregue a página (ou clique em outra aba e volte) para ver a atualização PRO!`
+          });
+
+          setTimeout(() => {
+            fetchProfile().catch(err => console.error('Error reloading profile:', err));
+          }, 1500);
+        } else {
+          setSimResult({
+            success: false,
+            title: `Falha na Simulação (${statusValue})`,
+            msg: `O servidor de destino recusou o webhook: ${responseText}\n\nNota: Verifique se este e-mail já existe cadastrado antes do teste.`
+          });
+        }
       }
     } catch (err: any) {
       setSimResult({
         success: false,
         title: 'Erro de Conexão',
-        msg: err?.message || 'Erro inesperado na chamada da API.'
+        msg: err?.message || 'Erro inesperado na chamada do servidor.'
       });
     } finally {
       setSimulating(false);

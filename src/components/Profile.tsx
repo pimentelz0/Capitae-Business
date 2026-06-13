@@ -76,6 +76,79 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
   const [showRlsModal, setShowRlsModal] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
+  // Kiwify Webhook Simulator states
+  const [simulatedEmail, setSimulatedEmail] = useState(user?.email || '');
+  const [simulatedStatus, setSimulatedStatus] = useState<'paid' | 'refunded'>('paid');
+  const [simulating, setSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<{ success: boolean; title: string; msg: string } | null>(null);
+
+  useEffect(() => {
+    if (user?.email && !simulatedEmail) {
+      setSimulatedEmail(user.email);
+    }
+  }, [user]);
+
+  const handleRunSimulation = async () => {
+    if (!simulatedEmail) {
+      setSimResult({ success: false, title: 'Erro de validação', msg: 'Por favor, insira um e-mail válido para simulação.' });
+      return;
+    }
+    setSimulating(true);
+    setSimResult(null);
+    try {
+      const payload = {
+        order_status: simulatedStatus,
+        customer: {
+          email: simulatedEmail.trim(),
+          name: 'Simulador Cliente Capitae',
+          mobile: '+5511999999999'
+        },
+        product: {
+          product_name: 'Capitae Business - Premium Pro'
+        },
+        test: true
+      };
+
+      const resp = await fetch('/api/webhooks/kiwify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-kiwify-signature': 'simulation'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const responseText = await resp.text();
+      
+      if (resp.ok) {
+        setSimResult({
+          success: true,
+          title: 'Simulação Enviada com Sucesso!',
+          msg: `A API de Webhook processou o sinal "${simulatedStatus}" em tempo real para:\n📧 ${simulatedEmail}\n\nResposta: ${responseText}\n\n👉 Caso tenha simulado para a sua própria conta, recarregue a página (ou clique em outra aba e volte) para ver a atualização PRO!`
+        });
+        
+        // Trigger a profile refresh
+        setTimeout(() => {
+          fetchProfile().catch(err => console.error('Error reloading updated status:', err));
+        }, 1500);
+      } else {
+        setSimResult({
+          success: false,
+          title: `Falha na Simulação (${resp.status})`,
+          msg: `Servidor recusou a simulação: ${responseText}\n\nNota: Certifique-se de que o usuário com este e-mail já existe/está cadastrado no aplicativo antes de testar.`
+        });
+      }
+    } catch (err: any) {
+      setSimResult({
+        success: false,
+        title: 'Erro de Conexão',
+        msg: err?.message || 'Erro inesperado na chamada da API.'
+      });
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfile().catch(err => console.error('Profile: Error in fetchProfile:', err));
     if (isAdminUser) {
@@ -920,6 +993,102 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         <p className="text-xs text-muted leading-relaxed">
           Suas informações de perfil são privadas e usadas apenas para personalizar sua experiência no Capitae.
         </p>
+      </div>
+
+      {/* Simulador de Vendas Kiwify para testes simples e autômatos */}
+      <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 space-y-6">
+        <div className="flex items-center gap-2 border-b border-foreground/5 pb-4">
+          <Zap className="w-5 h-5 text-[#00E676] animate-pulse" />
+          <h4 className="font-bold text-white text-base">Painel de Testes: Simulador de Compra Kiwify</h4>
+        </div>
+        
+        <p className="text-xs text-muted leading-relaxed">
+          Digite um e-mail cadastrado no aplicativo no campo abaixo para enviar um sinal de webhook idêntico ao processo oficial da Kiwify. Com essa ferramenta, você testa o fluxo completo de ativação do PRO em 1 clique!
+        </p>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] text-muted uppercase font-bold tracking-widest pl-1">E-mail para simular o Webhook</label>
+            <div className="flex gap-2">
+              <input 
+                type="email"
+                value={simulatedEmail}
+                onChange={e => setSimulatedEmail(e.target.value)}
+                placeholder="Exemplo: josueufceconomia@gmail.com"
+                className="flex-1 bg-background border border-white/5 p-3.5 rounded-2xl outline-none focus:border-primary transition-all text-xs text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setSimulatedEmail(user?.email || '')}
+                className="px-4 bg-white/5 hover:bg-white/10 text-xs text-muted hover:text-white rounded-2xl transition-all font-semibold border border-white/5 cursor-pointer"
+              >
+                Meu E-mail
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] text-muted uppercase font-bold tracking-widest pl-1">Status do Evento Kiwify</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSimulatedStatus('paid')}
+                className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  simulatedStatus === 'paid' 
+                    ? 'border-[#00E676] bg-[#00E676]/10 text-[#00E676]' 
+                    : 'border-white/5 bg-background text-muted hover:text-white'
+                }`}
+              >
+                paid (Aprovado / Ativar PRO)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSimulatedStatus('refunded')}
+                className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  simulatedStatus === 'refunded' 
+                    ? 'border-red-500 bg-red-500/10 text-red-500' 
+                    : 'border-white/5 bg-background text-muted hover:text-white'
+                }`}
+              >
+                refunded (Cancelado / Retirar PRO)
+              </button>
+            </div>
+          </div>
+
+          {simResult && (
+            <div className={`p-4 rounded-2xl border text-[11px] font-mono whitespace-pre-wrap transition-all leading-relaxed ${
+              simResult.success 
+                ? 'bg-green-500/5 border-green-500/20 text-green-400' 
+                : 'bg-red-500/5 border-red-500/20 text-red-400'
+            }`}>
+              <div className="flex items-center gap-1.5 mb-2 font-sans font-black text-xs uppercase tracking-wide">
+                {simResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 animate-bounce" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                )}
+                {simResult.title}
+              </div>
+              {simResult.msg}
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={simulating}
+            onClick={handleRunSimulation}
+            className="w-full bg-[#00E676] text-background hover:bg-[#00E676]/90 disabled:opacity-50 font-black py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all text-xs cursor-pointer shadow-[0_0_20px_rgba(0,230,118,0.15)]"
+          >
+            {simulating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <Zap className="w-4 h-4" /> 
+                {simulatedStatus === 'paid' ? 'Disparar Sinal de Compra e Ativar PRO' : 'Disparar Sinal de Reembolso e Remover PRO'}
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>

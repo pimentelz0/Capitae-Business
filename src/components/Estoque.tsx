@@ -21,7 +21,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
   const [categoria, setCategoria] = useState('');
   const [quantidade, setQuantidade] = useState<number>(0);
   const [estoqueMinimo, setEstoqueMinimo] = useState<number>(5);
-  const [precoCusto, setPrecoCusto] = useState<number>(0);
+  const [precoCusto, setPrecoCusto] = useState<number | null>(null);
   const [precoVenda, setPrecoVenda] = useState<number>(0);
 
   // Edit form wrapper triggers
@@ -31,7 +31,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
     setCategoria(p.categoria);
     setQuantidade(p.quantidade);
     setEstoqueMinimo(p.estoque_minimo);
-    setPrecoCusto(p.preco_custo);
+    setPrecoCusto(p.preco_custo !== undefined ? p.preco_custo : null);
     setPrecoVenda(p.preco_venda);
     setShowAddForm(true);
   };
@@ -42,7 +42,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
     setCategoria('');
     setQuantidade(0);
     setEstoqueMinimo(5);
-    setPrecoCusto(0);
+    setPrecoCusto(null);
     setPrecoVenda(0);
     setShowAddForm(false);
   };
@@ -50,7 +50,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
   // Submit product creation or update
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome || !categoria || quantidade < 0 || precoCusto < 0 || precoVenda < 0) {
+    const isPrecoCustoValid = precoCusto === null || precoCusto === undefined || precoCusto >= 0;
+    if (!nome || !categoria || quantidade < 0 || !isPrecoCustoValid || precoVenda < 0) {
       alert('Preencha os campos obrigatórios com valores válidos.');
       return;
     }
@@ -92,7 +93,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
   const lowStockItems = produtos.filter(p => p.quantidade <= p.estoque_minimo && p.quantidade > 0).length;
   const outOfStockItems = produtos.filter(p => p.quantidade === 0).length;
   
-  const investidoTotal = produtos.reduce((sum, p) => sum + (p.preco_custo * p.quantidade), 0);
+  const investidoTotal = produtos.reduce((sum, p) => sum + ((p.preco_custo || 0) * p.quantidade), 0);
   const faturamentoEstimado = produtos.reduce((sum, p) => sum + (p.preco_venda * p.quantidade), 0);
   const retornoEstimado = faturamentoEstimado - investidoTotal;
 
@@ -245,15 +246,17 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-xs text-muted font-bold uppercase">Preço de Custo (R$)*</label>
+                    <label className="text-xs text-muted font-bold uppercase">Custo de Aquisição (R$) <span className="text-[10px] text-primary lowercase">(opcional)</span></label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      required
-                      placeholder="0,00"
-                      value={precoCusto || ''}
-                      onChange={(e) => setPrecoCusto(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="Ex: 0,00"
+                      value={precoCusto === null || precoCusto === undefined || isNaN(precoCusto) ? '' : precoCusto}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setPrecoCusto(val === null || isNaN(val) ? null : Math.max(0, val));
+                      }}
                       className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-black text-red-400 transition-all"
                     />
                   </div>
@@ -381,7 +384,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
 
                         {/* Cost */}
                         <td className="py-3.5 px-2 text-right font-mono font-medium text-red-400">
-                          R$ {isPrivateMode ? '•••' : p.preco_custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {isPrivateMode ? '•••' : p.preco_custo !== null && p.preco_custo !== undefined ? p.preco_custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
                         </td>
 
                         {/* Price */}

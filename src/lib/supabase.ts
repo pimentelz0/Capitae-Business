@@ -294,7 +294,7 @@ export const getSafeUser = async (retryCount = 0): Promise<any> => {
         );
 
         if (isRefreshTokenError) {
-          console.error('Supabase: Invalid refresh token detected in getSafeUser, force clearing session...');
+          console.warn('Supabase: Invalid refresh token detected in getSafeUser, force clearing session...');
           
           // First, proactively clear storage so the corrupted session is gone immediately
           if (typeof window !== 'undefined' && window.localStorage) {

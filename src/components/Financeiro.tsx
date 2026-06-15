@@ -10,9 +10,18 @@ interface FinanceiroProps {
   onDeleteTransacao: (id: string) => void;
   onEditTransacao?: (transacao: Transacao) => void;
   isPrivateMode: boolean;
+  isEmployeeModeActive?: boolean;
 }
 
-export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransacaoStatus, onDeleteTransacao, onEditTransacao, isPrivateMode }: FinanceiroProps) {
+export default function Financeiro({ 
+  transacoes, 
+  onAddTransacao, 
+  onUpdateTransacaoStatus, 
+  onDeleteTransacao, 
+  onEditTransacao, 
+  isPrivateMode,
+  isEmployeeModeActive = false
+}: FinanceiroProps) {
   const [subTab, setSubTab] = useState<'geral' | 'pagar' | 'receber'>('geral');
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7dias' | 'mes' | 'todos'>('mes');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -38,7 +47,10 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (valor <= 0 || !descricao || !categoria) {
+    
+    const finalCategory = categoria || (tipo === 'entrada' ? 'Vendas' : 'Outros');
+
+    if (valor <= 0 || !descricao || !finalCategory) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
@@ -55,7 +67,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
           tipo,
           valor,
           descricao,
-          categoria,
+          categoria: finalCategory,
           data,
           tipo_registro: tipoRegistro,
           data_vencimento: finalVencimento,
@@ -69,7 +81,7 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
         tipo,
         valor,
         descricao,
-        categoria,
+        categoria: finalCategory,
         data,
         tipo_registro: tipoRegistro,
         data_vencimento: finalVencimento,
@@ -202,63 +214,65 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
       </div>
 
       {/* Grid of Financial Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Faturamento do Período */}
-        <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-5">
-            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Entradas</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <TrendingUp className="w-4 h-4" />
+      {!isEmployeeModeActive && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Faturamento do Período */}
+          <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
+            <div className="flex justify-between items-center mb-5">
+              <span className="text-[10px] font-black text-muted uppercase tracking-widest">Entradas</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <TrendingUp className="w-4 h-4" />
+              </div>
             </div>
+            <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-white leading-none">
+              R$ {isPrivateMode ? '••••••' : totalInflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
+              <span>Faturamento Bruto</span>
+              <span className="text-emerald-400 font-bold">Liquidado</span>
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors" />
           </div>
-          <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-white leading-none">
-            R$ {isPrivateMode ? '••••••' : totalInflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h2>
-          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
-            <span>Faturamento Bruto</span>
-            <span className="text-emerald-400 font-bold">Liquidado</span>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors" />
-        </div>
 
-        {/* Card 2: Custos / Despesas */}
-        <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-5">
-            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saídas</span>
-            <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500">
-              <TrendingDown className="w-4 h-4" />
+          {/* Card 2: Custos / Despesas */}
+          <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
+            <div className="flex justify-between items-center mb-5">
+              <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saídas</span>
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500">
+                <TrendingDown className="w-4 h-4" />
+              </div>
             </div>
+            <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-red-500 leading-none">
+              R$ {isPrivateMode ? '••••••' : totalOutflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
+              <span>Compras e Despesas</span>
+              <span className="text-red-400 font-bold">Pago</span>
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-red-500/5 rounded-full blur-xl group-hover:bg-red-500/10 transition-colors" />
           </div>
-          <h2 className="text-4xl md:text-[40px] font-black tracking-tight text-red-500 leading-none">
-            R$ {isPrivateMode ? '••••••' : totalOutflows.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h2>
-          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
-            <span>Compras e Despesas</span>
-            <span className="text-red-400 font-bold">Pago</span>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-red-500/5 rounded-full blur-xl group-hover:bg-red-500/10 transition-colors" />
-        </div>
 
-        {/* Card 3: Saldo Final */}
-        <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-5">
-            <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saldo Líquido</span>
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <DollarSign className="w-4 h-4" />
+          {/* Card 3: Saldo Final */}
+          <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 relative overflow-hidden group">
+            <div className="flex justify-between items-center mb-5">
+              <span className="text-[10px] font-black text-muted uppercase tracking-widest">Saldo Líquido</span>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <DollarSign className="w-4 h-4" />
+              </div>
             </div>
+            <h2 className={`text-4xl md:text-[40px] font-black tracking-tight leading-none ${saldoFinal < 0 ? 'text-red-500' : 'text-primary'}`}>
+              R$ {isPrivateMode ? '••••••' : saldoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
+              <span>Lucro Operacional</span>
+              <span className={`${saldoFinal < 0 ? 'text-red-400' : 'text-primary'} font-bold`}>
+                {saldoFinal < 0 ? 'Defasagem' : 'Superavit'}
+              </span>
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors" />
           </div>
-          <h2 className={`text-4xl md:text-[40px] font-black tracking-tight leading-none ${saldoFinal < 0 ? 'text-red-500' : 'text-primary'}`}>
-            R$ {isPrivateMode ? '••••••' : saldoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h2>
-          <div className="flex justify-between items-center mt-4 text-[10px] text-muted">
-            <span>Lucro Operacional</span>
-            <span className={`${saldoFinal < 0 ? 'text-red-400' : 'text-primary'} font-bold`}>
-              {saldoFinal < 0 ? 'Defasagem' : 'Superavit'}
-            </span>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors" />
         </div>
-      </div>
+      )}
 
       {/* Dynamic Add Transaction Form Modal Overlay */}
       {showAddForm && (
@@ -276,168 +290,210 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto relative z-10">
-              <div className="space-y-4">
-                {/* Type Selection */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted font-bold uppercase">Tipo de Lançamento</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTipo('entrada')}
-                      className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        tipo === 'entrada' 
-                          ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-                          : 'bg-background hover:bg-foreground/5 text-muted border border-transparent'
-                      }`}
-                    >
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      Entrada (Receita / Venda)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipo('saida')}
-                      className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        tipo === 'saida' 
-                          ? 'bg-red-500/10 border border-red-500/20 text-red-500' 
-                          : 'bg-background hover:bg-foreground/5 text-muted border border-transparent'
-                      }`}
-                    >
-                      <TrendingDown className="w-3.5 h-3.5" />
-                      Saída (Despesa / Conta)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted font-bold uppercase">Valor (R$)*</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="0,00"
-                    value={valor === 0 ? '' : valor}
-                    onChange={(e) => setValor(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary transition-all font-bold text-base"
-                  />
-                </div>
-
-                {/* Manual Cost Field for Sales/Entradas */}
-                {tipo === 'entrada' && (
-                  <div className="space-y-2 bg-foreground/5 p-4 rounded-2xl border border-foreground/5">
-                    <label className="text-xs text-muted font-bold uppercase flex items-center justify-between">
-                      <span>Custo de Aquisição (R$)</span>
-                      <span className="text-[10px] text-primary lowercase">opcional</span>
-                    </label>
+              {isEmployeeModeActive ? (
+                /* Super Slick Employee Mode Form: Only Valor and Descricao */
+                <div className="col-span-2 space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Valor da Venda (R$)*</label>
                     <input
                       type="number"
                       step="0.01"
+                      required
                       placeholder="0,00"
-                      value={custoVenda === 0 ? '' : custoVenda}
-                      onChange={(e) => setCustoVenda(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-background border border-foreground/10 p-3 rounded-xl text-white outline-none focus:border-primary transition-all text-sm"
+                      value={valor === 0 ? '' : valor}
+                      onChange={(e) => setValor(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-background border border-foreground/10 p-4 rounded-2xl text-white outline-none focus:border-primary transition-all font-bold text-xl"
                     />
-                    <p className="text-[10px] text-muted tracking-tight leading-normal mt-1">
-                      Custo estimado investido para obter este produto. Ele será deduzido do valor total para calcular o lucro líquido em relatórios e listagens.
-                    </p>
                   </div>
-                )}
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted font-bold uppercase">Descrição / Beneficiário*</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: Conta de Luz CPFL, Venda de Mercadoria..."
-                    value={descricao}
-                    onChange={(e) => setDescricao(e.target.value)}
-                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
-                  />
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase">Descrição da Venda*</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Venda de Mercadoria..."
+                      value={descricao}
+                      onChange={(e) => setDescricao(e.target.value)}
+                      className="w-full bg-background border border-foreground/10 p-4 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                    />
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-primary text-background font-bold rounded-2xl transition-all shadow-lg hover:bg-opacity-95 text-xs tracking-wider uppercase"
+                    >
+                      {editingId ? 'Salvar Edições' : 'Salvar Registro'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                {/* Category Selector */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted font-bold uppercase">Categoria*</label>
-                  <select
-                    value={categoria}
-                    onChange={(e) => setCategoria(e.target.value)}
-                    required
-                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white text-sm outline-none focus:border-primary transition-all cursor-pointer"
-                  >
-                    <option value="" disabled>Selecione uma categoria...</option>
-                    {(tipo === 'entrada' ? categoriasEntrada : categoriasSaida).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Date */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted font-bold uppercase">Data do Lançamento</label>
-                  <input
-                    type="date"
-                    value={data}
-                    onChange={(e) => setData(e.target.value)}
-                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
-                  />
-                </div>
-
-                {/* Status / Recurrence Schedule */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
-                    <label className="text-xs text-muted font-bold uppercase">Liquidação</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTipoRegistro('imediato')}
-                        className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${
-                          tipoRegistro === 'imediato'
-                            ? 'bg-primary/10 border border-primary/20 text-primary'
-                            : 'bg-background hover:bg-foreground/5 text-muted'
-                        }`}
-                      >
-                        Pago / Recebido Hoje
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTipoRegistro(tipo === 'entrada' ? 'receber' : 'pagar')}
-                        className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${
-                          tipoRegistro !== 'imediato'
-                            ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-500'
-                            : 'bg-background hover:bg-foreground/5 text-muted'
-                        }`}
-                      >
-                        Agendar Vencimento
-                      </button>
+              ) : (
+                /* Full Standard Form for Owner/Admin */
+                <>
+                  <div className="space-y-4">
+                    {/* Type Selection */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Tipo de Lançamento</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipo('entrada')}
+                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            tipo === 'entrada' 
+                              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+                              : 'bg-background hover:bg-foreground/5 text-muted border border-transparent'
+                          }`}
+                        >
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          Entrada (Receita / Venda)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipo('saida')}
+                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            tipo === 'saida' 
+                              ? 'bg-red-500/10 border border-red-500/20 text-red-500' 
+                              : 'bg-background hover:bg-foreground/5 text-muted border border-transparent'
+                          }`}
+                        >
+                          <TrendingDown className="w-3.5 h-3.5" />
+                          Saída (Despesa / Conta)
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {tipoRegistro !== 'imediato' && (
-                    <div className="space-y-2 col-span-2">
-                      <label className="text-xs text-muted font-bold uppercase">Data de Vencimento*</label>
+                    {/* Amount */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Valor (R$)*</label>
                       <input
-                        type="date"
+                        type="number"
+                        step="0.01"
                         required
-                        value={vencimento}
-                        onChange={(e) => setVencimento(e.target.value)}
+                        placeholder="0,00"
+                        value={valor === 0 ? '' : valor}
+                        onChange={(e) => setValor(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary transition-all font-bold text-base"
+                      />
+                    </div>
+
+                    {/* Manual Cost Field for Sales/Entradas */}
+                    {tipo === 'entrada' && (
+                      <div className="space-y-2 bg-foreground/5 p-4 rounded-2xl border border-foreground/5">
+                        <label className="text-xs text-muted font-bold uppercase flex items-center justify-between">
+                          <span>Custo de Aquisição (R$)</span>
+                          <span className="text-[10px] text-primary lowercase">opcional</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={custoVenda === 0 ? '' : custoVenda}
+                          onChange={(e) => setCustoVenda(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-background border border-foreground/10 p-3 rounded-xl text-white outline-none focus:border-primary transition-all text-sm"
+                        />
+                        <p className="text-[10px] text-muted tracking-tight leading-normal mt-1">
+                          Custo estimado investido para obter este produto. Ele será deduzido do valor total para calcular o lucro líquido em relatórios e listagens.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Descrição / Beneficiário*</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Conta de Luz CPFL, Venda de Mercadoria..."
+                        value={descricao}
+                        onChange={(e) => setDescricao(e.target.value)}
                         className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    className="w-full py-4 bg-primary text-background font-bold rounded-2xl transition-all shadow-lg hover:bg-opacity-95 text-xs tracking-wider uppercase"
-                  >
-                    {editingId ? 'Salvar Edições' : 'Salvar Registro'}
-                  </button>
-                </div>
-              </div>
+                  <div className="space-y-4">
+                    {/* Category Selector */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Categoria*</label>
+                      <select
+                        value={categoria}
+                        onChange={(e) => setCategoria(e.target.value)}
+                        required
+                        className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white text-sm outline-none focus:border-primary transition-all cursor-pointer"
+                      >
+                        <option value="" disabled>Selecione uma categoria...</option>
+                        {(tipo === 'entrada' ? categoriasEntrada : categoriasSaida).map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted font-bold uppercase">Data do Lançamento</label>
+                      <input
+                        type="date"
+                        value={data}
+                        onChange={(e) => setData(e.target.value)}
+                        className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                      />
+                    </div>
+
+                    {/* Status / Recurrence Schedule */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-xs text-muted font-bold uppercase">Liquidação</label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTipoRegistro('imediato')}
+                            className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${
+                              tipoRegistro === 'imediato'
+                                ? 'bg-primary/10 border border-primary/20 text-primary'
+                                : 'bg-background hover:bg-foreground/5 text-muted'
+                            }`}
+                          >
+                            Pago / Recebido Hoje
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTipoRegistro(tipo === 'entrada' ? 'receber' : 'pagar')}
+                            className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${
+                              tipoRegistro !== 'imediato'
+                                ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-500'
+                                : 'bg-background hover:bg-foreground/5 text-muted'
+                            }`}
+                          >
+                            Agendar Vencimento
+                          </button>
+                        </div>
+                      </div>
+
+                      {tipoRegistro !== 'imediato' && (
+                        <div className="space-y-2 col-span-2">
+                          <label className="text-xs text-muted font-bold uppercase">Data de Vencimento*</label>
+                          <input
+                            type="date"
+                            required
+                            value={vencimento}
+                            onChange={(e) => setVencimento(e.target.value)}
+                            className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-4">
+                      <button
+                        type="submit"
+                        className="w-full py-4 bg-primary text-background font-bold rounded-2xl transition-all shadow-lg hover:bg-opacity-95 text-xs tracking-wider uppercase"
+                      >
+                        {editingId ? 'Salvar Edições' : 'Salvar Registro'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </form>
           </div>
         </div>
@@ -529,11 +585,11 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                       <tr className="border-b border-foreground/5 text-[10px] text-muted font-bold uppercase tracking-wider">
                         <th className="py-3 px-2">Data</th>
                         <th className="py-3 px-2">Descrição</th>
-                        <th className="py-3 px-2">Categoria</th>
-                        <th className="py-3 px-2">Meio</th>
+                        {!isEmployeeModeActive && <th className="py-3 px-2">Categoria</th>}
+                        {!isEmployeeModeActive && <th className="py-3 px-2">Meio</th>}
                         <th className="py-3 px-2 text-right">Valor</th>
-                        <th className="py-3 px-2 text-right">Custo</th>
-                        <th className="py-3 px-2 text-right">Lucro</th>
+                        {!isEmployeeModeActive && <th className="py-3 px-2 text-right">Custo</th>}
+                        {!isEmployeeModeActive && <th className="py-3 px-2 text-right">Lucro</th>}
                         <th className="py-3 px-2 text-center">Ações</th>
                       </tr>
                     </thead>
@@ -542,21 +598,27 @@ export default function Financeiro({ transacoes, onAddTransacao, onUpdateTransac
                         <tr key={t.id} className="hover:bg-foreground/5 transition-colors group">
                           <td className="py-3.5 px-2 text-muted font-mono">{formatDateBrief(t.data)}</td>
                           <td className="py-3.5 px-2 font-bold text-white max-w-xs truncate">{t.descricao}</td>
-                          <td className="py-3.5 px-2">
-                            <span className="text-xs bg-background/50 border border-foreground/5 px-2.5 py-1 rounded-lg">
-                              {t.categoria}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-2 text-xs text-muted">{t.meio_pagamento || '-'}</td>
+                          {!isEmployeeModeActive && (
+                            <td className="py-3.5 px-2">
+                              <span className="text-xs bg-background/50 border border-foreground/5 px-2.5 py-1 rounded-lg">
+                                {t.categoria}
+                              </span>
+                            </td>
+                          )}
+                          {!isEmployeeModeActive && <td className="py-3.5 px-2 text-xs text-muted">{t.meio_pagamento || '-'}</td>}
                           <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {t.tipo === 'entrada' ? '+' : '-'} R$ {isPrivateMode ? '•••' : t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
-                          <td className="py-3.5 px-2 text-right text-red-500 font-semibold">
-                            {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.custo_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
-                          </td>
-                          <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-red-400/80'}`}>
-                            {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.valor - (t.custo_venda || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ -${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
-                          </td>
+                          {!isEmployeeModeActive && (
+                            <td className="py-3.5 px-2 text-right text-red-500 font-semibold">
+                              {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.custo_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                            </td>
+                          )}
+                          {!isEmployeeModeActive && (
+                            <td className={`py-3.5 px-2 text-right font-bold ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-red-400/80'}`}>
+                              {isPrivateMode ? '•••' : (t.tipo === 'entrada' ? `R$ ${(t.valor - (t.custo_venda || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ -${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                            </td>
+                          )}
                           <td className="py-3.5 px-2 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               <button

@@ -23,7 +23,10 @@ import {
   Clock,
   Check,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Shield,
+  ShieldOff,
+  Lock
 } from 'lucide-react';
 
 // Domain imports
@@ -34,6 +37,7 @@ import Estoque from './Estoque';
 import Relatorios from './Relatorios';
 import Precificacao from './Precificacao';
 import Profile from './Profile';
+import EmployeePinUnlockScreen from './EmployeePinUnlockScreen';
 
 // Context components
 import OnboardingModal from './OnboardingModal';
@@ -262,6 +266,7 @@ export default function Dashboard({ user }: DashboardProps) {
     return (localStorage.getItem(`capitae_business_theme_${user.id}`) as 'dark' | 'light') || 'dark';
   });
   const [isPrivateMode, setIsPrivateMode] = useState(false);
+  const [isSessionUnlocked, setIsSessionUnlocked] = useState(false);
 
   // Persist theme to localStorage
   useEffect(() => {
@@ -273,6 +278,127 @@ export default function Dashboard({ user }: DashboardProps) {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Derived Employee Mode values
+  const isEmployeeModeActive = profile?.employee_mode !== undefined 
+    ? !!profile.employee_mode 
+    : (localStorage.getItem(`capitae_employee_mode_${user.id}`) === 'true');
+
+  const employeePinHash = profile?.employee_pin_hash 
+    ? profile.employee_pin_hash 
+    : (localStorage.getItem(`capitae_employee_pin_hash_${user.id}`) || '');
+
+  // Reset session unlock if employee mode is deactivated
+  useEffect(() => {
+    if (!isEmployeeModeActive) {
+      setIsSessionUnlocked(false);
+    }
+  }, [isEmployeeModeActive]);
+
+  // Dashboard Employee Mode header PIN states
+  const [showDashboardPinModal, setShowDashboardPinModal] = useState(false);
+  const [dashboardPin, setDashboardPin] = useState('');
+  const [dashboardPinError, setDashboardPinError] = useState('');
+  const [dashboardPinMode, setDashboardPinMode] = useState<'unlock' | 'setup'>('unlock');
+  const [dashboardSetupPin, setDashboardSetupPin] = useState('');
+  const [dashboardSetupPinConfirm, setDashboardSetupPinConfirm] = useState('');
+
+  // Helper to hash a 4-digit PIN with salt
+  const hashPIN = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin + "capitae_salt_2026");
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Persists the employee mode toggle to database & local caching
+  const updateEmployeeMode = async (mode: boolean, pinHash: string) => {
+    const updatedProfile = { 
+      ...profile, 
+      employee_mode: mode, 
+      employee_pin_hash: pinHash 
+    };
+    setProfile(updatedProfile);
+    
+    localStorage.setItem(`capitae_employee_mode_${user.id}`, String(mode));
+    localStorage.setItem(`capitae_employee_pin_hash_${user.id}`, pinHash);
+
+    if (user.id !== 'guest_user') {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            employee_mode: mode,
+            employee_pin_hash: pinHash,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+      } catch (err) {
+        console.error('Erro ao atualizar modo funcionário:', err);
+      }
+    }
+  };
+
+  // Header button click to switch mode
+  const handleToggleEmployeeModeHeader = () => {
+    if (isEmployeeModeActive) {
+      setDashboardPin('');
+      setDashboardPinError('');
+      setDashboardPinMode('unlock');
+      setShowDashboardPinModal(true);
+    } else {
+      if (!employeePinHash) {
+        setDashboardSetupPin('');
+        setDashboardSetupPinConfirm('');
+        setDashboardPinError('');
+        setDashboardPinMode('setup');
+        setShowDashboardPinModal(true);
+      } else {
+        updateEmployeeMode(true, employeePinHash);
+      }
+    }
+  };
+
+  // Handle PIN form submission from Dashboard Modal
+  const handleDashboardPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDashboardPinError('');
+
+    if (dashboardPinMode === 'setup') {
+      if (dashboardSetupPin.length !== 4 || !/^\d+$/.test(dashboardSetupPin)) {
+        setDashboardPinError('O PIN deve conter exatamente 4 dígitos numéricos.');
+        return;
+      }
+      if (dashboardSetupPin !== dashboardSetupPinConfirm) {
+        setDashboardPinError('Os PINs digitados não são iguais.');
+        return;
+      }
+      try {
+        const pinHash = await hashPIN(dashboardSetupPin);
+        await updateEmployeeMode(true, pinHash);
+        setShowDashboardPinModal(false);
+      } catch (err: any) {
+        setDashboardPinError('Erro ao salvar PIN: ' + err.message);
+      }
+    } else {
+      if (dashboardPin.length !== 4) {
+        setDashboardPinError('O PIN deve conter exatamente 4 dígitos.');
+        return;
+      }
+      try {
+        const pinHash = await hashPIN(dashboardPin);
+        if (pinHash === employeePinHash) {
+          await updateEmployeeMode(false, employeePinHash);
+          setShowDashboardPinModal(false);
+        } else {
+          setDashboardPinError('PIN incorreto. Tente novamente.');
+        }
+      } catch (err: any) {
+        setDashboardPinError('Erro ao validar PIN: ' + err.message);
+      }
+    }
+  };
 
   // Subscription and 7-day Trial state
   const ADMIN_EMAILS = [
@@ -794,8 +920,64 @@ export default function Dashboard({ user }: DashboardProps) {
   };
 
   const handleUpdateProduto = (updatedP: Produto) => {
-    const updated = produtos.map(p => p.id === updatedP.id ? updatedP : p);
-    saveProductsToCache(updated);
+    // 1. Update the product list state and cache
+    const updatedProductsList = produtos.map(p => p.id === updatedP.id ? updatedP : p);
+    saveProductsToCache(updatedProductsList);
+
+    // 2. If Custo de Aquisição (preco_custo) is now defined, search and update pending transactions
+    if (updatedP.preco_custo !== null && updatedP.preco_custo !== undefined) {
+      let transactionsUpdated = false;
+      const updatedTransacoes = transacoes.map(t => {
+        let matches = false;
+
+        // Check single-item transaction
+        if (t.produto_id === updatedP.id && t.custo_pendente) {
+          matches = true;
+          const qtd = t.produto_qtd || 1;
+          const newCustoVenda = (updatedP.preco_custo || 0) * qtd;
+          transactionsUpdated = true;
+          return {
+            ...t,
+            custo_venda: newCustoVenda,
+            custo_pendente: false
+          };
+        }
+
+        // Check multi-item transaction (PDV sales listing cart)
+        if (t.itens_venda && t.itens_venda.length > 0) {
+          const updatedItens = t.itens_venda.map(item => {
+            if (item.produto_id === updatedP.id && (item.custo_pendente || item.preco_custo === null || item.preco_custo === undefined)) {
+              matches = true;
+              return {
+                ...item,
+                preco_custo: updatedP.preco_custo,
+                custo_pendente: false
+              };
+            }
+            return item;
+          });
+
+          if (matches) {
+            transactionsUpdated = true;
+            // Recalculate whole transaction cost of goods sold (COGS)
+            const newCustoVendaTotal = updatedItens.reduce((sum, item) => sum + ((item.preco_custo || 0) * item.qtd), 0);
+            const stillPending = updatedItens.some(item => item.custo_pendente);
+            return {
+              ...t,
+              itens_venda: updatedItens,
+              custo_venda: newCustoVendaTotal,
+              custo_pendente: stillPending
+            };
+          }
+        }
+
+        return t;
+      });
+
+      if (transactionsUpdated) {
+        saveTransactionsToCache(updatedTransacoes);
+      }
+    }
   };
 
   const handleUpdateProdutoQuantidade = (id: string, novaQuantidade: number) => {
@@ -874,6 +1056,7 @@ export default function Dashboard({ user }: DashboardProps) {
             onDeleteTransacao={handleDeleteTransacao}
             onEditTransacao={handleEditTransacao}
             isPrivateMode={isPrivateMode}
+            isEmployeeModeActive={isEmployeeModeActive}
           />
         );
       case 'estoque':
@@ -887,6 +1070,14 @@ export default function Dashboard({ user }: DashboardProps) {
           />
         );
       case 'relatorios':
+        if (isEmployeeModeActive && !isSessionUnlocked) {
+          return (
+            <EmployeePinUnlockScreen 
+              pinHash={employeePinHash}
+              onUnlock={() => setIsSessionUnlocked(true)}
+            />
+          );
+        }
         return (
           <Relatorios 
             transacoes={transacoes}
@@ -894,6 +1085,14 @@ export default function Dashboard({ user }: DashboardProps) {
           />
         );
       case 'precificacao':
+        if (isEmployeeModeActive && !isSessionUnlocked) {
+          return (
+            <EmployeePinUnlockScreen 
+              pinHash={employeePinHash}
+              onUnlock={() => setIsSessionUnlocked(true)}
+            />
+          );
+        }
         return (
           <Precificacao 
             isPrivateMode={isPrivateMode}
@@ -989,14 +1188,21 @@ export default function Dashboard({ user }: DashboardProps) {
             </p>
           </div>
 
-          {/* Right part: Theme toggle + Notification Center */}
+          {/* Right part: Employee Mode + Notification Center */}
           <div className="flex items-center gap-2.5">
             <button 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-1.5 hover:bg-foreground/5 rounded-xl transition-colors text-muted"
-              title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+              onClick={handleToggleEmployeeModeHeader}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center relative ${
+                isEmployeeModeActive 
+                  ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20 font-black' 
+                  : 'text-muted hover:text-white hover:bg-foreground/5'
+              }`}
+              title={isEmployeeModeActive ? 'Modo Funcionário Ativo (Acesso Restrito) - Clique para desativar' : 'Ativar Modo Funcionário (Privacidade de Dados)'}
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {isEmployeeModeActive ? <ShieldOff className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+              {isEmployeeModeActive && (
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+              )}
             </button>
             
             <NotificationCenter 
@@ -1127,6 +1333,20 @@ export default function Dashboard({ user }: DashboardProps) {
                   >
                     <UserIcon className="w-5 h-5" />
                     Meu Perfil
+                  </button>
+
+                  <button 
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="w-full flex items-center justify-between p-3.5 rounded-2xl font-black transition-all text-sm border border-transparent text-muted hover:text-white hover:bg-foreground/5 cursor-pointer"
+                    title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                  >
+                    <div className="flex items-center gap-4">
+                      {theme === 'dark' ? <Sun className="w-5 h-5 animate-pulse" /> : <Moon className="w-5 h-5" />}
+                      <span>Tema Escuro</span>
+                    </div>
+                    <div className={`w-8 h-4 rounded-full flex items-center p-0.5 transition-all ${theme === 'dark' ? 'bg-[#00E676] justify-end' : 'bg-white/10 justify-start'}`}>
+                      <div className="w-3 h-3 rounded-full bg-slate-950 shadow-md" />
+                    </div>
                   </button>
 
                   <button 
@@ -1457,6 +1677,115 @@ export default function Dashboard({ user }: DashboardProps) {
         </div>
       )}
     </div>
+
+    {/* Dashboard Employee PIN Modal */}
+    <AnimatePresence>
+      {showDashboardPinModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowDashboardPinModal(false)}
+            className="absolute inset-0 bg-background/80 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl space-y-6 z-10"
+          >
+            <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto text-amber-500">
+              {dashboardPinMode === 'setup' ? <Lock className="w-6 h-6 animate-pulse" /> : <Shield className="w-6 h-6" />}
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-black text-white font-sans tracking-tight">
+                {dashboardPinMode === 'setup' ? 'Configurar PIN de Acesso' : 'Desativar Modo Funcionário'}
+              </h3>
+              <p className="text-xs text-muted max-w-xs mx-auto leading-relaxed">
+                {dashboardPinMode === 'setup' 
+                  ? 'Crie um PIN numérico de 4 dígitos para que você possa sair do Modo Funcionário no futuro.' 
+                  : 'Digite o seu PIN de 4 dígitos para restaurar a visualização completa e habilitar o acesso administrador.'}
+              </p>
+            </div>
+
+            <form onSubmit={handleDashboardPinSubmit} className="space-y-4">
+              {dashboardPinMode === 'setup' ? (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-muted font-bold uppercase tracking-wider block">Novo PIN (4 dígitos)</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      required
+                      placeholder="••••"
+                      value={dashboardSetupPin}
+                      onChange={(e) => setDashboardSetupPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-full bg-background border border-foreground/10 py-3.5 px-4 rounded-2xl text-white text-center text-2xl font-bold tracking-[0.4em] focus:border-primary outline-none transition-all placeholder:text-foreground/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-muted font-bold uppercase tracking-wider block">Confirmar PIN</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      required
+                      placeholder="••••"
+                      value={dashboardSetupPinConfirm}
+                      onChange={(e) => setDashboardSetupPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-full bg-background border border-foreground/10 py-3.5 px-4 rounded-2xl text-white text-center text-2xl font-bold tracking-[0.4em] focus:border-primary outline-none transition-all placeholder:text-foreground/20"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] text-muted font-bold uppercase tracking-wider block text-center">Digite o PIN cadastrado</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    required
+                    placeholder="••••"
+                    value={dashboardPin}
+                    onChange={(e) => setDashboardPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full bg-background border border-foreground/10 py-3.5 px-4 rounded-2xl text-white text-center text-2xl font-bold tracking-[0.4em] focus:border-primary outline-none transition-all placeholder:text-foreground/20"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {dashboardPinError && (
+                <p className="text-xs text-red-400 text-center font-bold animate-shake bg-red-400/10 py-2.5 px-3.5 rounded-xl border border-red-400/20">
+                  {dashboardPinError}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDashboardPinModal(false)}
+                  className="flex-1 py-3 px-4 bg-foreground/5 hover:bg-foreground/10 text-muted font-bold rounded-2xl transition-all text-xs uppercase"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 px-4 bg-primary text-background hover:bg-opacity-90 font-bold rounded-2xl transition-all text-xs uppercase shadow-lg shadow-primary/10"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
 
     {/* Fixed Bottom Navigation Bar (placed outside translated container) */}
     <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-foreground/5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex justify-around items-center z-50">

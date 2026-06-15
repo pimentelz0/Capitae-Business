@@ -21,6 +21,8 @@ interface ProfileData {
   perc_essentials: number;
   perc_leisure: number;
   perc_investment: number;
+  employee_mode?: boolean;
+  employee_pin_hash?: string;
 }
 
 interface ProfileProps {
@@ -51,7 +53,9 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
     fixed_costs: 0,
     perc_essentials: 50,
     perc_leisure: 30,
-    perc_investment: 20
+    perc_investment: 20,
+    employee_mode: false,
+    employee_pin_hash: ''
   });
   const [userEmail, setUserEmail] = useState<string | undefined>(user.email);
   const [newPassword, setNewPassword] = useState('');
@@ -60,6 +64,15 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Employee Mode states
+  const [showSetupPinModal, setShowSetupPinModal] = useState(false);
+  const [showDisablePinModal, setShowDisablePinModal] = useState(false);
+  const [setupPin, setSetupPin] = useState('');
+  const [confirmSetupPin, setConfirmSetupPin] = useState('');
+  const [disablePin, setDisablePin] = useState('');
+  const [setupPinError, setSetupPinError] = useState('');
+  const [disablePinError, setDisablePinError] = useState('');
 
   // Admin configurations and State
   const ADMIN_EMAILS = [
@@ -309,6 +322,9 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
+        const localMode = localStorage.getItem(`capitae_employee_mode_${user.id}`) === 'true';
+        const localPinHash = localStorage.getItem(`capitae_employee_pin_hash_${user.id}`) || '';
+
         const loadedProfile = {
           display_name: data.display_name || '',
           avatar_url: data.avatar_url || '',
@@ -324,7 +340,9 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
           fixed_costs: data.fixed_costs || 0,
           perc_essentials: data.perc_essentials || 50,
           perc_leisure: data.perc_leisure || 30,
-          perc_investment: data.perc_investment || 20
+          perc_investment: data.perc_investment || 20,
+          employee_mode: data.employee_mode !== undefined ? !!data.employee_mode : localMode,
+          employee_pin_hash: data.employee_pin_hash || localPinHash
         };
         setProfile(loadedProfile);
         if (onUpdateProfile) {
@@ -376,6 +394,117 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
       alert('Erro ao salvar perfil: ' + error.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const hashPIN = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin + "capitae_salt_2026");
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const handleEmployeeToggle = async () => {
+    const nextMode = !profile.employee_mode;
+    
+    if (nextMode) {
+      const hasPin = !!profile.employee_pin_hash;
+      if (!hasPin) {
+        setSetupPin('');
+        setConfirmSetupPin('');
+        setSetupPinError('');
+        setShowSetupPinModal(true);
+      } else {
+        await updateEmployeeModeDB(true, profile.employee_pin_hash || '');
+      }
+    } else {
+      setDisablePin('');
+      setDisablePinError('');
+      setShowDisablePinModal(true);
+    }
+  };
+
+  const handleSetupPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSetupPinError('');
+    
+    if (setupPin.length !== 4 || !/^\d+$/.test(setupPin)) {
+      setSetupPinError('O PIN deve conter exatamente 4 dígitos numéricos.');
+      return;
+    }
+    
+    if (setupPin !== confirmSetupPin) {
+      setSetupPinError('As senhas do PIN não coincidem.');
+      return;
+    }
+    
+    try {
+      const pinHash = await hashPIN(setupPin);
+      await updateEmployeeModeDB(true, pinHash);
+      setShowSetupPinModal(false);
+    } catch (err: any) {
+      setSetupPinError('Falha ao processar criptografia do PIN: ' + err.message);
+    }
+  };
+
+  const handleDisablePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDisablePinError('');
+    
+    if (disablePin.length !== 4) {
+      setDisablePinError('O PIN deve conter 4 dígitos.');
+      return;
+    }
+    
+    try {
+      const pinHash = await hashPIN(disablePin);
+      if (pinHash === profile.employee_pin_hash) {
+        await updateEmployeeModeDB(false, profile.employee_pin_hash || '');
+        setShowDisablePinModal(false);
+      } else {
+        setDisablePinError('PIN inválido! Tente novamente.');
+      }
+    } catch (err: any) {
+      setDisablePinError('Falha ao validar PIN: ' + err.message);
+    }
+  };
+
+  const updateEmployeeModeDB = async (mode: boolean, pinHash: string) => {
+    const updatedProfile = { 
+      ...profile, 
+      employee_mode: mode, 
+      employee_pin_hash: pinHash 
+    };
+    setProfile(updatedProfile);
+    
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        employee_mode: mode,
+        employee_pin_hash: pinHash
+      });
+    }
+
+    localStorage.setItem(`capitae_employee_mode_${user.id}`, String(mode));
+    localStorage.setItem(`capitae_employee_pin_hash_${user.id}`, pinHash);
+
+    if (user.id !== 'guest_user') {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            employee_mode: mode,
+            employee_pin_hash: pinHash,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.warn('Sync warning on Supabase update: ', error.message);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase profile columns update failed:', dbErr);
+      }
     }
   };
 
@@ -854,6 +983,8 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
         </div>
       )}
 
+
+
       {/* Alterar Senha */}
       <div className="bg-secondary p-6 rounded-3xl border border-foreground/5 space-y-6">
         <div className="flex items-center gap-2 border-b border-foreground/5 pb-4">
@@ -925,6 +1056,160 @@ export default function Profile({ user, isPro, isTrialActive, onUpgrade, onUpdat
 
 
       <AnimatePresence>
+        {showSetupPinModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSetupPinModal(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl space-y-6"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto">
+                  <Shield className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Criar PIN de Acesso</h3>
+                  <p className="text-xs text-muted leading-relaxed mt-1">
+                    Defina um PIN numérico de 4 dígitos para proteger as abas de Relatórios, Precificação e desativar o Modo Funcionário futuramente.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSetupPinSubmit} className="space-y-4">
+                {setupPinError && (
+                  <p className="text-[11px] font-black text-red-400 text-center uppercase tracking-wide">
+                    {setupPinError}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] text-muted uppercase font-bold tracking-widest pl-1">Digitar PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      pattern="\d*"
+                      inputMode="numeric"
+                      value={setupPin}
+                      onChange={e => setSetupPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••"
+                      className="w-full text-center tracking-[12px] font-extrabold bg-background border border-foreground/10 p-3 rounded-2xl text-white text-lg focus:border-primary transition-all outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] text-muted uppercase font-bold tracking-widest pl-1">Confirmar PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      pattern="\d*"
+                      inputMode="numeric"
+                      value={confirmSetupPin}
+                      onChange={e => setConfirmSetupPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••"
+                      className="w-full text-center tracking-[12px] font-extrabold bg-background border border-foreground/10 p-3 rounded-2xl text-white text-lg focus:border-primary transition-all outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupPinModal(false)}
+                    className="flex-1 py-3.5 bg-foreground/5 hover:bg-foreground/10 text-muted hover:text-white font-bold rounded-2xl transition-all active:scale-95 text-xs uppercase"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3.5 bg-[#00E676] text-background font-black rounded-2xl transition-all active:scale-95 text-xs uppercase"
+                  >
+                    Confirmar & Ativar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {showDisablePinModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDisablePinModal(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-secondary border border-foreground/10 p-6 rounded-[32px] overflow-hidden shadow-2xl space-y-6"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Desativar Modo Funcionário</h3>
+                  <p className="text-xs text-muted leading-relaxed mt-1">
+                    Digite o PIN de 4 dígitos cadastrado para desativar a privacidade financeira e retornar ao acesso completo.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleDisablePinSubmit} className="space-y-4">
+                {disablePinError && (
+                  <p className="text-[11px] font-black text-red-400 text-center uppercase tracking-wide">
+                    {disablePinError}
+                  </p>
+                )}
+
+                <div className="space-y-1.5 max-w-[150px] mx-auto">
+                  <label className="text-[9px] text-muted uppercase font-bold tracking-widest pl-1 text-center block">Digite o PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    pattern="\d*"
+                    inputMode="numeric"
+                    value={disablePin}
+                    onChange={e => setDisablePin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="••••"
+                    className="w-full text-center tracking-[12px] font-extrabold bg-background border border-foreground/10 p-3 rounded-2xl text-white text-lg focus:border-red-500 transition-all outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDisablePinModal(false)}
+                    className="flex-1 py-3.5 bg-foreground/5 hover:bg-foreground/10 text-muted hover:text-white font-bold rounded-2xl transition-all active:scale-95 text-xs uppercase"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3.5 bg-red-500 text-white font-black rounded-2xl transition-all active:scale-95 text-xs uppercase"
+                  >
+                    Desativar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
         {showLogoutConfirm && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div

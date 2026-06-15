@@ -4,7 +4,7 @@ export interface Produto {
   categoria: string;
   quantidade: number;
   estoque_minimo: number;
-  preco_custo: number;
+  preco_custo: number | null;
   preco_venda: number;
 }
 
@@ -22,7 +22,8 @@ export interface Transacao {
   custo_venda?: number; // Embedded cost of products sold
   produto_id?: string; // If single product or quick sale
   produto_qtd?: number; // Quantity of the product
-  itens_venda?: { produto_id: string; qtd: number; nome: string }[]; // If multiple items (from PDV cart)
+  itens_venda?: { produto_id: string; qtd: number; nome: string; preco_custo?: number | null; custo_pendente?: boolean }[]; // If multiple items (from PDV cart)
+  custo_pendente?: boolean;
 }
 
 export interface CaixaDiario {

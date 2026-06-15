@@ -190,8 +190,6 @@ export default function App() {
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('App: Auth session error:', error);
-          
           // Handle refresh token errors
           const errorMsg = error.message || '';
           // Check if this is a transient network or offline error to prevent accidental sign outs
@@ -217,7 +215,7 @@ export default function App() {
           );
 
           if (isRefreshTokenError) {
-            console.error('App: Invalid refresh token detected, force clearing session and reloading...');
+            console.warn('App: Invalid refresh token detected in getSession, force clearing session and reloading...');
             
             // Proactively clear storage first so it is clean immediately
             if (typeof window !== 'undefined' && window.localStorage) {
@@ -309,7 +307,7 @@ export default function App() {
       );
       
       if (isRefreshTokenError) {
-        console.error('App: Caught refresh token error in global handler, force clearing session and reloading...');
+        console.warn('App: Caught refresh token error in global handler, force clearing session and reloading...');
         
         // Proactively clear storage first so it is clean immediately
         if (typeof window !== 'undefined' && window.localStorage) {

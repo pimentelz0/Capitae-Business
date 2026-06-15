@@ -141,6 +141,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     });
 
     // Create single unified entry transaction with integrated product cost and items metadata
+    const hasCustoPendente = cart.some(item => item.produto.preco_custo === null || item.produto.preco_custo === undefined);
+
     const transacaoUnica: Omit<Transacao, 'id'> = {
       tipo: 'entrada',
       descricao: descriptionText,
@@ -154,8 +156,13 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       itens_venda: cart.map(item => ({
         produto_id: item.produto.id,
         qtd: item.qtd,
-        nome: item.produto.nome
-      }))
+        nome: item.produto.nome,
+        preco_custo: item.produto.preco_custo,
+        custo_pendente: item.produto.preco_custo === null || item.produto.preco_custo === undefined
+      })),
+      custo_pendente: hasCustoPendente,
+      produto_id: cart.length === 1 ? cart[0].produto.id : undefined,
+      produto_qtd: cart.length === 1 ? cart[0].qtd : undefined
     };
 
     onAddTransacao(transacaoUnica);

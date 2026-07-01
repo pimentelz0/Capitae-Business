@@ -6,6 +6,7 @@ export interface Produto {
   estoque_minimo: number;
   preco_custo: number | null;
   preco_venda: number;
+  codigo_barras?: string | null;
 }
 
 export interface Transacao {

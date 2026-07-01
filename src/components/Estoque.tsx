@@ -23,6 +23,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
   const [estoqueMinimo, setEstoqueMinimo] = useState<number>(5);
   const [precoCusto, setPrecoCusto] = useState<number | null>(null);
   const [precoVenda, setPrecoVenda] = useState<number>(0);
+  const [codigoBarras, setCodigoBarras] = useState('');
 
   // Edit form wrapper triggers
   const startEdit = (p: Produto) => {
@@ -33,6 +34,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
     setEstoqueMinimo(p.estoque_minimo);
     setPrecoCusto(p.preco_custo !== undefined ? p.preco_custo : null);
     setPrecoVenda(p.preco_venda);
+    setCodigoBarras(p.codigo_barras || '');
     setShowAddForm(true);
   };
 
@@ -44,6 +46,7 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
     setEstoqueMinimo(5);
     setPrecoCusto(null);
     setPrecoVenda(0);
+    setCodigoBarras('');
     setShowAddForm(false);
   };
 
@@ -64,7 +67,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
         quantidade,
         estoque_minimo: estoqueMinimo,
         preco_custo: precoCusto,
-        preco_venda: precoVenda
+        preco_venda: precoVenda,
+        codigo_barras: codigoBarras.trim() || null
       });
     } else {
       onAddProduto({
@@ -73,7 +77,8 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
         quantidade,
         estoque_minimo: estoqueMinimo,
         preco_custo: precoCusto,
-        preco_venda: precoVenda
+        preco_venda: precoVenda,
+        codigo_barras: codigoBarras.trim() || null
       });
     }
 
@@ -216,6 +221,20 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
                     className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted font-bold uppercase flex items-center gap-1">
+                    <span>Código de Barras</span>
+                    <span className="text-[10px] text-primary lowercase">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Escaneie com o leitor ou digite..."
+                    value={codigoBarras}
+                    onChange={(e) => setCodigoBarras(e.target.value)}
+                    className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-mono transition-all"
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -334,7 +353,14 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
                         {/* Name */}
                         <td className="py-3.5 px-2">
                           <p className="font-extrabold text-foreground truncate max-w-xs">{p.nome}</p>
-                          <span className="text-[10px] text-muted font-mono">ID: #{p.id.substring(0, 8)}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-muted font-mono">ID: #{p.id.substring(0, 8)}</span>
+                            {p.codigo_barras && (
+                              <span className="text-[10px] text-primary font-mono font-bold flex items-center gap-1" title="Código de barras cadastrado">
+                                🏷️ {p.codigo_barras}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Category */}

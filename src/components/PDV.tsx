@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Produto, Transacao } from '../types';
-import { ShoppingCart, Plus, Minus, Search, Tag, Check, CreditCard, DollarSign, RefreshCw, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Search, Tag, Check, CreditCard, DollarSign, RefreshCw, AlertCircle, Barcode } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PDVProps {
@@ -20,6 +20,11 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [recentTotal, setRecentTotal] = useState(0);
 
+  // Barcode scanner states
+  const [scannedBarcode, setScannedBarcode] = useState('');
+  const [barcodeError, setBarcodeError] = useState('');
+  const [barcodeSuccessMessage, setBarcodeSuccessMessage] = useState('');
+
   // New Product Modal States
   const [showAddForm, setShowAddForm] = useState(false);
   const [nome, setNome] = useState('');
@@ -28,6 +33,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
   const [estoqueMinimo, setEstoqueMinimo] = useState<number>(5);
   const [precoCusto, setPrecoCusto] = useState<number>(0);
   const [precoVenda, setPrecoVenda] = useState<number>(0);
+  const [codigoBarrasProductNew, setCodigoBarrasProductNew] = useState('');
 
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +49,8 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
         quantidade,
         estoque_minimo: estoqueMinimo,
         preco_custo: precoCusto,
-        preco_venda: precoVenda
+        preco_venda: precoVenda,
+        codigo_barras: codigoBarrasProductNew.trim() || null
       });
     }
 
@@ -54,7 +61,34 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     setEstoqueMinimo(5);
     setPrecoCusto(0);
     setPrecoVenda(0);
+    setCodigoBarrasProductNew('');
     setShowAddForm(false);
+  };
+
+  const handleBarcodeScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = scannedBarcode.trim();
+    if (!cleanCode) return;
+
+    const found = produtos.find(p => p.codigo_barras === cleanCode);
+    if (found) {
+      if (found.quantidade <= 0) {
+        setBarcodeError(`O produto "${found.nome}" está fora de estoque.`);
+        setBarcodeSuccessMessage('');
+        return;
+      }
+      addToCart(found);
+      setScannedBarcode('');
+      setBarcodeError('');
+      setBarcodeSuccessMessage(`🛒 ${found.nome} adicionado!`);
+      // Auto dismiss success message
+      setTimeout(() => {
+        setBarcodeSuccessMessage('');
+      }, 3000);
+    } else {
+      setBarcodeError(`Código "${cleanCode}" não associado a nenhum produto.`);
+      setBarcodeSuccessMessage('');
+    }
   };
 
   // Revenda Rápida States
@@ -302,17 +336,70 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
           {pdvMode === 'estoque' ? (
             <>
               <div className="bg-secondary border border-foreground/5 p-4 rounded-3xl space-y-3">
-                {/* Search and Filters */}
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                  <input 
-                    type="text"
-                    placeholder="Pesquisar produto pelo nome ou categoria..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-background border border-foreground/5 pl-11 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white placeholder-muted"
-                  />
+                {/* Search and Barcode Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Search and Filters */}
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                    <input 
+                      type="text"
+                      placeholder="Pesquisar produto pelo nome..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-background border border-foreground/5 pl-11 pr-4 py-3.5 rounded-2xl text-sm outline-none focus:border-primary transition-all text-white placeholder-muted"
+                    />
+                  </div>
+
+                  {/* Barcode Scanner lookup */}
+                  <form onSubmit={handleBarcodeScan} className="relative">
+                    <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />
+                    <input 
+                      type="text"
+                      placeholder="Escaneie o código com o leitor..."
+                      value={scannedBarcode}
+                      onChange={(e) => setScannedBarcode(e.target.value)}
+                      className="w-full bg-background border border-foreground/5 pl-11 pr-16 py-3.5 rounded-2xl text-sm font-mono outline-none focus:border-primary transition-all text-white placeholder-muted focus:ring-1 focus:ring-primary/20"
+                    />
+                    {scannedBarcode && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setScannedBarcode('');
+                          setBarcodeError('');
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] uppercase font-bold text-muted hover:text-white bg-foreground/5 px-2 py-1 rounded-md"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </form>
                 </div>
+
+                {/* Scanned product messages */}
+                <AnimatePresence>
+                  {barcodeSuccessMessage && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-2xl text-xs font-bold flex items-center gap-2"
+                    >
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{barcodeSuccessMessage}</span>
+                    </motion.div>
+                  )}
+                  {barcodeError && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-2xl text-xs font-bold flex items-center gap-2"
+                    >
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                      <span>{barcodeError}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Category tabs */}
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -733,6 +820,20 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
                       value={categoria}
                       onChange={(e) => setCategoria(e.target.value)}
                       className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase flex items-center gap-1">
+                      <span>Código de Barras</span>
+                      <span className="text-[10px] text-primary lowercase">(opcional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Escaneie ou digite..."
+                      value={codigoBarrasProductNew}
+                      onChange={(e) => setCodigoBarrasProductNew(e.target.value)}
+                      className="w-full bg-background border border-foreground/10 p-3.5 rounded-2xl text-white outline-none focus:border-primary text-sm font-mono transition-all"
                     />
                   </div>
                 </div>

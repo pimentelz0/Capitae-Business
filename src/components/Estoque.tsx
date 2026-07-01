@@ -85,6 +85,74 @@ export default function Estoque({ produtos, onAddProduto, onUpdateProduto, onDel
     handleCancel();
   };
 
+  // Smart background global barcode scanner listener for Estoque screen
+  React.useEffect(() => {
+    if (!showAddForm) return;
+
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      const activeElement = document.activeElement;
+      const isFocusedOnInput = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.getAttribute('contenteditable') === 'true'
+      );
+
+      // Enter key finishes the barcode
+      if (e.key === 'Enter') {
+        const cleanCode = buffer.trim();
+        if (cleanCode.length >= 3) {
+          e.preventDefault();
+          setCodigoBarras(cleanCode);
+
+          // Clean up any leaked first character from active input
+          if (isFocusedOnInput && activeElement && (activeElement instanceof HTMLInputElement)) {
+            const firstChar = cleanCode.charAt(0);
+            if (activeElement.value.endsWith(firstChar)) {
+              activeElement.value = activeElement.value.slice(0, -1);
+              activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+              
+              // Trigger onChange handlers manually if applicable
+              if (activeElement.placeholder?.includes('Coca-Cola')) {
+                setNome(activeElement.value);
+              } else if (activeElement.placeholder?.includes('Bebidas')) {
+                setCategoria(activeElement.value);
+              }
+            }
+          }
+        }
+        buffer = '';
+        return;
+      }
+
+      if (e.key.length !== 1) return;
+
+      const isScannerSpeed = timeDiff < 50;
+      if (isFocusedOnInput && !isScannerSpeed) {
+        buffer = '';
+      }
+
+      if (isScannerSpeed && buffer.length > 0) {
+        e.preventDefault();
+      }
+
+      buffer += e.key;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddForm]);
+
   // Micro adjustments in-line
   const adjustQty = (produto: Produto, increment: number) => {
     onUpdateProduto({

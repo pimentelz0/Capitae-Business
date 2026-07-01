@@ -91,6 +91,7 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
     }
   };
 
+
   // Revenda Rápida States
   const [pdvMode, setPdvMode] = useState<'estoque' | 'revenda'>('estoque');
   const [revendaNome, setRevendaNome] = useState('');
@@ -128,6 +129,80 @@ export default function PDV({ produtos, onAddTransacao, onUpdateProdutoQuantidad
       setCart([...cart, { produto, qtd: 1 }]);
     }
   };
+
+  // Smart background global barcode scanner listener
+  React.useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept barcode scanners if add product modal is open
+      if (showAddForm) return;
+
+      // Ignore modifier keys
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      const activeElement = document.activeElement;
+      const isFocusedOnInput = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.getAttribute('contenteditable') === 'true'
+      );
+
+      // A key pressed on Enter finishes the barcode
+      if (e.key === 'Enter') {
+        const cleanCode = buffer.trim();
+        if (cleanCode.length >= 3) {
+          // Check if this code exists in our products list
+          const found = produtos.find(p => p.codigo_barras === cleanCode);
+          if (found) {
+            e.preventDefault();
+            if (found.quantidade <= 0) {
+              setBarcodeError(`O produto "${found.nome}" está fora de estoque.`);
+              setBarcodeSuccessMessage('');
+            } else {
+              addToCart(found);
+              setBarcodeError('');
+              setBarcodeSuccessMessage(`🛒 ${found.nome} adicionado automaticamente via leitor!`);
+              setTimeout(() => {
+                setBarcodeSuccessMessage('');
+              }, 3000);
+            }
+            buffer = '';
+            return;
+          }
+        }
+        buffer = '';
+        return;
+      }
+
+      // Ignore if key is not a single character
+      if (e.key.length !== 1) return;
+
+      // If user is focused on some other input (not the barcode scan input) and typing slowly,
+      // reset buffer because it is manual typing, not a fast scanner device
+      const isScannerSpeed = timeDiff < 50; // scanner keys are typically separated by < 50ms
+      if (isFocusedOnInput && !isScannerSpeed) {
+        // If the focused input is the barcode search input itself, we can allow manual typing, but otherwise we reset buffer
+        const isBarcodeSearchInput = activeElement?.getAttribute('placeholder')?.includes('Escaneie');
+        if (!isBarcodeSearchInput) {
+          buffer = '';
+        }
+      }
+
+      // Add key to buffer
+      buffer += e.key;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [produtos, showAddForm, cart, addToCart]);
 
   const updateCartQtd = (produtoId: string, delta: number) => {
     const item = cart.find(i => i.produto.id === produtoId);
